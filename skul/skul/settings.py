@@ -25,15 +25,22 @@ SECRET_KEY = 'django-insecure-@4(5_)@(!cn(w4&e3&t_#!f&cj)hf2$udyjtx$a-*@-!x^)o_&
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication', 
+    ]
+}
 
 # Application definition
 
 INSTALLED_APPS = [
     'school',
+    'schoolauth',
     'rest_framework',
     'corsheaders',
+    'rest_framework.authtoken',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -54,8 +61,14 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOW_ALL_ORIGINS = [
-    'http://localhost:5173/'
+CORS_ALLOW_ALL_ORIGINS = True
+
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_HEADERS = [
+    'content-type',
+    'x-csrftoken',
+    'Authorization'
 ]
 
 ROOT_URLCONF = 'skul.urls'
@@ -108,6 +121,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+AUTH_USER_MODEL = "school.User"
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
