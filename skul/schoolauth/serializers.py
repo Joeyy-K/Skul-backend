@@ -77,22 +77,22 @@ class AssignmentSubmissionSerializer(serializers.ModelSerializer):
         fields = ['id', 'assignment', 'student', 'submission_date', 'file']
 
 class GradeSerializer(serializers.ModelSerializer):
-    students = StudentSerializer(many=True)
-    teacher = TeacherSerializer()
-
     class Meta:
         model = Grade
-        fields = ['id', 'name', 'school', 'teacher', 'students']
+        fields = ['id', 'name', 'school', 'teacher']
 
-    def update(self, instance, validated_data):
-        students_data = validated_data.pop('students')
-        instance = super().update(instance, validated_data)
+    def create(self, validated_data):
+        school_data = validated_data.pop('school', None)
+        if school_data:
+            school = School.objects.get(id=school_data.id)
+            grade = Grade.objects.create(
+                name=validated_data.get('name'),
+                school=school
+            )
+        else:
+            grade = Grade.objects.create(**validated_data)
 
-        for student_data in students_data:
-            student, created = Student.objects.get_or_create(**student_data)
-            instance.students.add(student)
-
-        return instance
+        return grade
 
 class AnnouncementSerializer(serializers.ModelSerializer):
     class Meta:

@@ -41,8 +41,14 @@ class Teacher(models.Model):
 
 class Grade(models.Model):
     name = models.CharField(max_length=255)
-    school = models.ForeignKey(School, on_delete=models.CASCADE)
-    teacher = models.OneToOneField(Teacher, on_delete=models.SET_NULL, null=True, related_name='teacher_grade')
+    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='grades')
+    teacher = models.OneToOneField(Teacher, on_delete=models.SET_NULL, null=True, blank=True, related_name='teacher_grade')
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.teacher:
+            self.teacher.grade = self
+            self.teacher.save()
 
     @property
     def student_count(self):

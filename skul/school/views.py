@@ -7,7 +7,8 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError, Permissi
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
-from .permissions import IsEventCreator, IsTeacherOrSchool
+from .permissions import IsEventCreator
+from rest_framework.views import APIView
 from school.models import School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Event, Announcement
 from schoolauth.serializers import SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, FeedbackSerializer, AttendanceSerializer, EventSerializer, AnnouncementSerializer
 import logging
@@ -21,6 +22,18 @@ class SchoolList(generics.ListCreateAPIView):
 class SchoolDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = School.objects.all()
     serializer_class = SchoolSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        data = serializer.data
+
+        student_count = instance.student_set.count()
+        teacher_count = instance.teacher_set.count()
+        data['student_count'] = student_count
+        data['teacher_count'] = teacher_count
+
+        return Response(data)
 
 class TeacherList(generics.ListCreateAPIView):
     queryset = Teacher.objects.all()
@@ -82,6 +95,15 @@ class StudentDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Student.objects.all()
     serializer_class = StudentSerializer
 
+class GradeStudentUpdate(APIView):
+    def post(self, request, grade_id):
+        grade = get_object_or_404(Grade, id=grade_id)
+        student_id = request.data.get('student_id')
+        student = get_object_or_404(Student, id=student_id)
+        student.grade = grade 
+        student.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 class AssignmentList(generics.ListCreateAPIView):
     serializer_class = AssignmentSerializer
 
@@ -114,9 +136,32 @@ class GradeList(generics.ListCreateAPIView):
     queryset = Grade.objects.all()
     serializer_class = GradeSerializer
 
+    def perform_create(self, serializer):
+        school_id = self.request.data.get('school')
+        school = School.objects.get(id=school_id)
+        serializer.save(school=school)
+
 class GradeDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Grade.objects.all()
     serializer_class = GradeSerializer
+
+class GradeTeacherUpdate(APIView):
+    def post(self, request, grade_id):
+        grade = get_object_or_404(Grade, id=grade_id)
+        teacher_id = request.data.get('teacher_id')
+        teacher = get_object_or_404(Teacher, id=teacher_id)
+        grade.teacher = teacher
+        grade.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+class RemoveStudentFromGrade(APIView):
+    def post(self, request, grade_id):
+        grade = get_object_or_404(Grade, id=grade_id)
+        student_id = request.data.get('student_id')
+        student = get_object_or_404(Student, id=student_id)
+        student.grade = None
+        student.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class ChannelList(generics.ListCreateAPIView):
     queryset = Channel.objects.all()
