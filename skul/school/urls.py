@@ -9,8 +9,11 @@ router.register(r'feedbacks', views.FeedbackViewSet)
 urlpatterns = [
     path('schools/', views.SchoolList.as_view()),
     path('schools/<int:pk>/', views.SchoolDetail.as_view()),
+    
     path('students/', views.StudentList.as_view()),
     path('students/<int:pk>/', views.StudentDetail.as_view()),
+    path('register_student/', views.StudentRegistration.as_view(), name='register_student'),
+
     path('assignments/', views.AssignmentList.as_view()),
     path('assignments/<int:pk>/', views.AssignmentDetail.as_view()),
     path('assignment-submissions/', views.AssignmentSubmissionList.as_view()),
