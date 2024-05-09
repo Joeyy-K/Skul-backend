@@ -34,7 +34,6 @@ class RegisterView(APIView):
 
             token, created = Token.objects.get_or_create(user=user)
             
-            # Use the appropriate serializer based on the role
             if role == 'school':
                 instance = School.objects.get(user=user)
                 user_serializer = SchoolSerializer(instance)

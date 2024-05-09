@@ -53,11 +53,19 @@ class TeacherSerializer(serializers.ModelSerializer):
 
 class StudentSerializer(serializers.ModelSerializer):
     user = UserSerializer()
+    school_name = serializers.SerializerMethodField()
+    grade_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Student
-        fields = ['id', 'user', 'first_name', 'last_name', 'school', 'grade']
+        fields = ['id', 'user', 'first_name', 'last_name', 'school', 'grade', 'school_name', 'grade_name']
 
+    def get_school_name(self, obj):
+        return obj.school.full_name if obj.school else None
+
+    def get_grade_name(self, obj):
+        return obj.grade.name if obj.grade else None
+    
     def create(self, validated_data):
         user_data = validated_data.pop('user')
         user = User(**user_data)
@@ -65,6 +73,41 @@ class StudentSerializer(serializers.ModelSerializer):
         user.save()
         Student.objects.create(user=user, **validated_data)
         return user
+    
+class StudentRegistrationSerializer(serializers.Serializer):
+    first_name = serializers.CharField(max_length=255, required=True)
+    last_name = serializers.CharField(max_length=255, required=True)
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(write_only=True, required=True)
+    email = serializers.EmailField(required=True)
+    school = serializers.IntegerField(required=True)
+    grade = serializers.IntegerField(required=False, allow_null=True)
+    role = serializers.CharField(required=True)
+
+    def create(self, validated_data):
+        user_data = {
+            'username': validated_data.get('username'),
+            'password': validated_data.get('password'),
+            'email': validated_data.get('email'),
+            'is_student': validated_data.get('role') == 'student',
+        }
+        user = User.objects.create_user(**user_data)
+
+        school_id = validated_data.get('school')
+        grade_id = validated_data.get('grade')
+
+        school = School.objects.get(id=school_id)
+        grade = None if grade_id is None else Grade.objects.get(id=grade_id)
+
+        student = Student.objects.create(
+            user=user,
+            first_name=validated_data.get('first_name'),
+            last_name=validated_data.get('last_name'),
+            school=school,
+            grade=grade
+        )
+
+        return student
     
 class AssignmentSerializer(serializers.ModelSerializer):
     class Meta:

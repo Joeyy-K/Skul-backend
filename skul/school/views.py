@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404
 from .permissions import IsEventCreator, IsSchoolAdmin
 from rest_framework.views import APIView
 from school.models import School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Event, Announcement
-from schoolauth.serializers import SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, FeedbackSerializer, AttendanceSerializer, EventSerializer, AnnouncementSerializer
+from schoolauth.serializers import SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, FeedbackSerializer, AttendanceSerializer, EventSerializer, AnnouncementSerializer, StudentRegistrationSerializer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -86,9 +86,18 @@ class StudentList(generics.ListCreateAPIView):
 
     def get_queryset(self):
         school_id = self.request.query_params.get('school_id', None)
+        grade_id = self.request.query_params.get('grade_id', None)
+
         if school_id is not None:
             school = get_object_or_404(School, id=school_id)
-            return Student.objects.filter(school=school)
+            queryset = Student.objects.filter(school=school)
+
+            if grade_id is not None:
+                grade = get_object_or_404(Grade, id=grade_id)
+                queryset = queryset.filter(grade=grade)
+
+            return queryset.select_related('school', 'grade')
+
         return Student.objects.none()
     
 class StudentDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -97,22 +106,12 @@ class StudentDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class StudentRegistration(APIView):
     def post(self, request, format=None):
-        serializer = StudentSerializer(data=request.data)
+        request_data = request.data.copy()
+        request_data['role'] = 'student' 
+
+        serializer = StudentRegistrationSerializer(data=request_data)
         if serializer.is_valid():
-            school_id = serializer.validated_data.get('school')
-            grade_id = serializer.validated_data.get('grade')
-            school = School.objects.get(id=school_id)
-            grade = Grade.objects.get(id=grade_id)
-            print(school)
-            print(grade)
-            student = Student.objects.create(
-                first_name=serializer.validated_data.get('first_name'),
-                last_name=serializer.validated_data.get('last_name'),
-                email=serializer.validated_data.get('email'),
-                password=serializer.validated_data.get('password'),
-                school=school,
-                grade=grade  
-            )
+            student = serializer.save()
             return Response(StudentSerializer(student).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
