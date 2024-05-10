@@ -50,6 +50,36 @@ class TeacherSerializer(serializers.ModelSerializer):
         user.save()
         student = Student.objects.create(user=user, **student_data)
         return student
+    
+class TeacherRegistrationSerializer(serializers.Serializer):
+    first_name = serializers.CharField(max_length=255, required=True)
+    last_name = serializers.CharField(max_length=255, required=True)
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(write_only=True, required=True)
+    email = serializers.EmailField(required=True)
+    school = serializers.IntegerField(required=True)
+    role = serializers.CharField(required=True)
+
+    def create(self, validated_data):
+        user_data = {
+            'username': validated_data.get('username'),
+            'password': validated_data.get('password'),
+            'email': validated_data.get('email'),
+            'is_teacher': validated_data.get('role') == 'teacher',
+        }
+        user = User.objects.create_user(**user_data)
+
+        school_id = validated_data.get('school')
+        school = School.objects.get(id=school_id)
+
+        teacher = Teacher.objects.create(
+            user=user,
+            first_name=validated_data.get('first_name'),
+            last_name=validated_data.get('last_name'),
+            school=school,
+        )
+
+        return teacher
 
 class StudentSerializer(serializers.ModelSerializer):
     user = UserSerializer()
@@ -143,9 +173,11 @@ class AnnouncementSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'content', 'publish_date', 'school', 'attachment']
 
 class ChannelSerializer(serializers.ModelSerializer):
+    users = UserSerializer(many=True, read_only=True)
+
     class Meta:
         model = Channel
-        fields = ['id', 'name', 'description', 'type', 'is_visible_to_students', 'school']
+        fields = ['id', 'name', 'description', 'type', 'is_visible_to_students', 'school', 'users']
 
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:

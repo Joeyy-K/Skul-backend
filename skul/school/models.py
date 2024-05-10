@@ -7,7 +7,8 @@ class Channel(models.Model):
     description = models.TextField(blank=True, null=True)
     type = models.CharField(max_length=50, choices=[('class', 'Class'), ('school', 'School'), ('teacher', 'Teacher')])
     is_visible_to_students = models.BooleanField(default=True)
-    school = models.OneToOneField('School', on_delete=models.CASCADE, related_name='channel') 
+    school = models.ForeignKey('School', on_delete=models.CASCADE, related_name='channels')
+    users = models.ManyToManyField('User', related_name='channels')
 
 class User(AbstractUser):
     is_school = models.BooleanField('is_school', default=False)

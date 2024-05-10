@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404
 from .permissions import IsEventCreator, IsSchoolAdmin
 from rest_framework.views import APIView
 from school.models import School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Event, Announcement
-from schoolauth.serializers import SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, FeedbackSerializer, AttendanceSerializer, EventSerializer, AnnouncementSerializer, StudentRegistrationSerializer
+from schoolauth.serializers import SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, FeedbackSerializer, AttendanceSerializer, EventSerializer, AnnouncementSerializer, StudentRegistrationSerializer, TeacherRegistrationSerializer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -44,6 +44,16 @@ User = get_user_model()
 class TeacherViewSet(viewsets.ModelViewSet):
     queryset = Teacher.objects.all()
     serializer_class = TeacherSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_school:
+            school = user.school
+            return Teacher.objects.filter(school=school)
+        elif user.is_teacher:
+            return Teacher.objects.filter(id=user.teacher.id)
+        return Teacher.objects.none()
 
     @action(detail=True, methods=['post'])
     def transfer_student(self, request, pk=None):
@@ -79,6 +89,17 @@ class TeacherViewSet(viewsets.ModelViewSet):
 
         serializer = StudentSerializer(student)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class TeacherRegistration(APIView):
+    def post(self, request, format=None):
+        request_data = request.data.copy()
+        request_data['role'] = 'teacher'
+
+        serializer = TeacherRegistrationSerializer(data=request_data)
+        if serializer.is_valid():
+            teacher = serializer.save()
+            return Response(TeacherSerializer(teacher).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class StudentList(generics.ListCreateAPIView):
     serializer_class = StudentSerializer
@@ -191,6 +212,17 @@ class RemoveStudentFromGrade(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class ChannelList(generics.ListCreateAPIView):
+    serializer_class = ChannelSerializer
+
+    def get_queryset(self):
+        """
+        This view should return a list of all the channels
+        for the currently authenticated school.
+        """
+        school = self.request.user.school
+        return Channel.objects.filter(school=school)
+
+class ChannelDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Channel.objects.all()
     serializer_class = ChannelSerializer
 
