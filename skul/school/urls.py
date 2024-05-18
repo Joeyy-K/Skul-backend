@@ -7,6 +7,8 @@ router.register(r'teachers', views.TeacherViewSet)
 router.register(r'feedbacks', views.FeedbackViewSet)
 
 urlpatterns = [
+    path('school/<int:school_id>/users/', views.SchoolUsersView.as_view(), name='school-users'),
+
     path('schools/', views.SchoolList.as_view()),
     path('schools/<int:pk>/', views.SchoolDetail.as_view()),
 
@@ -31,7 +33,10 @@ urlpatterns = [
     path('channels/<int:pk>/', views.ChannelDetail.as_view(), name='channel-detail'),
     path('channels1/create/', views.ChannelCreate.as_view(), name='channel-create'),
 
-    path('messages/', views.MessageList.as_view(), name='message-list'), 
+    path('channels/<int:channel_id>/messages/', views.MessageListView.as_view(), name='message-list'),
+    path('channels/<int:channel_id>/messages/create/', views.MessageCreateView.as_view(), name='message-create'),
+
+    path('messages/', views.MessageListView.as_view(), name='message-list'), 
 
     path('attendance/', views.AttendanceList.as_view(), name='attendance-list'),
     path('attendance/<int:pk>/', views.AttendanceDetail.as_view(), name='attendance-detail'),

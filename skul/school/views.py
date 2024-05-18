@@ -10,10 +10,17 @@ from django.shortcuts import get_object_or_404
 from .permissions import IsEventCreator, IsSchoolAdmin
 from rest_framework.views import APIView
 from school.models import School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Event, Announcement
-from schoolauth.serializers import SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, FeedbackSerializer, AttendanceSerializer, EventSerializer, AnnouncementSerializer, StudentRegistrationSerializer, TeacherRegistrationSerializer
+from schoolauth.serializers import UserSerializer, SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, FeedbackSerializer, AttendanceSerializer, EventSerializer, AnnouncementSerializer, StudentRegistrationSerializer, TeacherRegistrationSerializer
 import logging
 
 logger = logging.getLogger(__name__)
+
+class SchoolUsersView(generics.ListAPIView):
+    serializer_class = UserSerializer
+
+    def get_queryset(self):
+        school_id = self.kwargs['school_id']
+        return User.objects.filter(school__id=school_id)
 
 class SchoolList(generics.ListCreateAPIView):
     queryset = School.objects.all()
@@ -235,9 +242,21 @@ class ChannelCreate(generics.CreateAPIView):
         school = School.objects.get(id=self.request.data['school'])
         school.user_set.update(channel=channel)
 
-class MessageList(generics.ListCreateAPIView):
-    queryset = Message.objects.filter(channel__isnull=False)
+class MessageListView(generics.ListAPIView):
     serializer_class = MessageSerializer
+
+    def get_queryset(self):
+        channel_id = self.kwargs['channel_id']
+        return Message.objects.filter(channel_id=channel_id)
+
+class MessageCreateView(APIView):
+    def post(self, request, channel_id):
+        channel = Channel.objects.get(id=channel_id)
+        serializer = MessageSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(sender=request.user, channel=channel)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class FeedbackViewSet(viewsets.ModelViewSet):
     queryset = Feedback.objects.all()
