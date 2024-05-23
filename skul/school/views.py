@@ -1,4 +1,6 @@
 from django.http import JsonResponse
+from django.db.models import Prefetch, Q
+from django.db import transaction
 from rest_framework import generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -11,16 +13,43 @@ from .permissions import IsEventCreator, IsSchoolAdmin
 from rest_framework.views import APIView
 from school.models import School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Event, Announcement
 from schoolauth.serializers import UserSerializer, SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, FeedbackSerializer, AttendanceSerializer, EventSerializer, AnnouncementSerializer, StudentRegistrationSerializer, TeacherRegistrationSerializer
-import logging
 
-logger = logging.getLogger(__name__)
+User = get_user_model()
 
 class SchoolUsersView(generics.ListAPIView):
     serializer_class = UserSerializer
 
     def get_queryset(self):
         school_id = self.kwargs['school_id']
-        return User.objects.filter(school__id=school_id)
+        return User.objects.filter(
+            Q(student__school__id=school_id) |
+            Q(teacher__school__id=school_id)
+        ).prefetch_related(
+            Prefetch('student', queryset=Student.objects.select_related('school')),
+            Prefetch('teacher', queryset=Teacher.objects.select_related('school'))
+        ).distinct()
+    
+class UserListView(generics.ListAPIView):
+    serializer_class = UserSerializer
+
+    def get_queryset(self):
+        """
+        Optionally restricts the returned users,
+        by filtering against a `category` query parameter in the URL.
+        """
+        queryset = User.objects.all()
+        category = self.request.query_params.get('category', None)
+        search = self.request.query_params.get('search', None)
+        if category is not None:
+            if category == 'teachers':
+                queryset = queryset.filter(is_teacher=True)
+            elif category == 'students':
+                queryset = queryset.filter(is_student=True)
+        if search is not None:
+            queryset = queryset.filter(first_name__icontains=search) | queryset.filter(last_name__icontains=search)
+        return queryset
+
+
 
 class SchoolList(generics.ListCreateAPIView):
     queryset = School.objects.all()
@@ -45,8 +74,6 @@ class SchoolDetail(generics.RetrieveUpdateDestroyAPIView):
 class TeacherList(generics.ListCreateAPIView):
     queryset = Teacher.objects.all()
     serializer_class = TeacherSerializer
-
-User = get_user_model()
 
 class TeacherViewSet(viewsets.ModelViewSet):
     queryset = Teacher.objects.all()
@@ -242,6 +269,35 @@ class ChannelCreate(generics.CreateAPIView):
         school = School.objects.get(id=self.request.data['school'])
         school.user_set.update(channel=channel)
 
+class AddUserToChannelView(APIView):
+    def post(self, request, channel_id, user_id):
+        try:
+            with transaction.atomic():
+                channel = Channel.objects.get(id=channel_id)
+                user = User.objects.get(id=user_id)
+
+                if user in channel.users.all():
+                    return Response({'error': 'User is already a member of this channel.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                channel.users.add(user)
+                user.channel = channel
+                user.save()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Channel.DoesNotExist:
+            return Response({'error': 'Channel not found'}, status=status.HTTP_404_NOT_FOUND)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+class ChannelUsersView(APIView):
+    def get(self, request, channel_id):
+        try:
+            channel = Channel.objects.get(id=channel_id)
+            users = channel.users.all()
+            user_data = UserSerializer(users, many=True).data
+            return Response(user_data)
+        except Channel.DoesNotExist:
+            return Response({'error': 'Channel not found'}, status=status.HTTP_404_NOT_FOUND)
+        
 class MessageListView(generics.ListAPIView):
     serializer_class = MessageSerializer
 

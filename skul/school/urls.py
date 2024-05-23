@@ -7,6 +7,8 @@ router.register(r'teachers', views.TeacherViewSet)
 router.register(r'feedbacks', views.FeedbackViewSet)
 
 urlpatterns = [
+    path('users/', views.UserListView.as_view(), name='user-list'),
+
     path('school/<int:school_id>/users/', views.SchoolUsersView.as_view(), name='school-users'),
 
     path('schools/', views.SchoolList.as_view()),
@@ -30,11 +32,13 @@ urlpatterns = [
     path('grades/<int:grade_id>/remove-student/', views.RemoveStudentFromGrade.as_view(), name='remove-student-from-grade'),
 
     path('channels/', views.ChannelList.as_view(), name='channel-list'),
-    path('channels/<int:pk>/', views.ChannelDetail.as_view(), name='channel-detail'),
     path('channels1/create/', views.ChannelCreate.as_view(), name='channel-create'),
+    path('channels/<int:pk>/', views.ChannelDetail.as_view(), name='channel-detail'),
 
+    path('channels/<int:channel_id>/users/', views.ChannelUsersView.as_view(), name='users-list'),
     path('channels/<int:channel_id>/messages/', views.MessageListView.as_view(), name='message-list'),
     path('channels/<int:channel_id>/messages/create/', views.MessageCreateView.as_view(), name='message-create'),
+    path('channels/<int:channel_id>/add_user/<int:user_id>/', views.AddUserToChannelView.as_view(), name='add-user-to-channel'),
 
     path('messages/', views.MessageListView.as_view(), name='message-list'), 
 
