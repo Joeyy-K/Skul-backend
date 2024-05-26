@@ -28,10 +28,12 @@ urlpatterns = [
     path('grades/', views.GradeList.as_view()),
     path('grades/<int:pk>/', views.GradeDetail.as_view()),
     path('grades/<int:grade_id>/teacher/', views.GradeTeacherUpdate.as_view()),
-    path('grades/<int:grade_id>/students/', views.GradeStudentUpdate.as_view()),
+    path('grades/<int:grade_id>/student/', views.GradeStudentUpdate.as_view()),
+    path('grades/<int:grade_id>/students/', views.StudentListByGrade.as_view(), name='student-list-by-grade'),
     path('grades/<int:grade_id>/remove-student/', views.RemoveStudentFromGrade.as_view(), name='remove-student-from-grade'),
 
     path('channels/', views.ChannelList.as_view(), name='channel-list'),
+    path('channels/user/', views.UserChannelListView.as_view(), name='user-channels'),
     path('channels1/create/', views.ChannelCreate.as_view(), name='channel-create'),
     path('channels/<int:pk>/', views.ChannelDetail.as_view(), name='channel-detail'),
 

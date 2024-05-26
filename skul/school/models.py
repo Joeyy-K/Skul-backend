@@ -14,7 +14,6 @@ class User(AbstractUser):
     is_school = models.BooleanField('is_school', default=False)
     is_teacher = models.BooleanField('is_teacher', default=False)
     is_student = models.BooleanField('is_student', default=False)
-    channel = models.ForeignKey(Channel, on_delete=models.SET_NULL, null=True, blank=True)
 
 class School(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE,  null=True)

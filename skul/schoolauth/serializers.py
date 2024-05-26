@@ -1,10 +1,17 @@
 from rest_framework import serializers
 from school.models import User, School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Event, Announcement
 
+class ChannelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Channel
+        fields = ['id', 'name', 'description', 'type', 'is_visible_to_students', 'school']
+
 class UserSerializer(serializers.ModelSerializer):
+    channels = ChannelSerializer(many=True, read_only=True)
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'password', 'date_joined', 'last_login', 'is_school', 'is_teacher', 'is_student', 'channel'] 
+        fields = ['id', 'username', 'email', 'is_school', 'is_teacher', 'is_student', 'channels']
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):
@@ -171,13 +178,6 @@ class AnnouncementSerializer(serializers.ModelSerializer):
     class Meta:
         model = Announcement
         fields = ['id', 'title', 'content', 'publish_date', 'school', 'attachment']
-
-class ChannelSerializer(serializers.ModelSerializer):
-    users = UserSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = Channel
-        fields = ['id', 'name', 'description', 'type', 'is_visible_to_students', 'school', 'users']
 
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:

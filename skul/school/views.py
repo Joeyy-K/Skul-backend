@@ -134,10 +134,17 @@ class TeacherRegistration(APIView):
             teacher = serializer.save()
             return Response(TeacherSerializer(teacher).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class StudentListByGrade(generics.ListAPIView):
+    serializer_class = StudentSerializer
+
+    def get_queryset(self):
+        grade_id = self.kwargs.get('grade_id')
+        grade = get_object_or_404(Grade, id=grade_id)
+        return Student.objects.filter(grade=grade)
 
 class StudentList(generics.ListCreateAPIView):
     serializer_class = StudentSerializer
-    permission_classes = [IsSchoolAdmin]
 
     def get_queryset(self):
         school_id = self.request.query_params.get('school_id', None)
@@ -272,16 +279,10 @@ class ChannelCreate(generics.CreateAPIView):
 class AddUserToChannelView(APIView):
     def post(self, request, channel_id, user_id):
         try:
-            with transaction.atomic():
-                channel = Channel.objects.get(id=channel_id)
-                user = User.objects.get(id=user_id)
+            channel = Channel.objects.get(id=channel_id)
+            user = User.objects.get(id=user_id)
 
-                if user in channel.users.all():
-                    return Response({'error': 'User is already a member of this channel.'}, status=status.HTTP_400_BAD_REQUEST)
-
-                channel.users.add(user)
-                user.channel = channel
-                user.save()
+            channel.users.add(user)
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Channel.DoesNotExist:
             return Response({'error': 'Channel not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -297,6 +298,15 @@ class ChannelUsersView(APIView):
             return Response(user_data)
         except Channel.DoesNotExist:
             return Response({'error': 'Channel not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+class UserChannelListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        channels = Channel.objects.filter(users=user)
+        serializer = ChannelSerializer(channels, many=True)
+        return Response(serializer.data)
         
 class MessageListView(generics.ListAPIView):
     serializer_class = MessageSerializer
