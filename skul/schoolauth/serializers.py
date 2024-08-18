@@ -1,10 +1,82 @@
 from rest_framework import serializers
 from school.models import User, School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Event, Announcement
 
+class UserProfileSerializer(serializers.ModelSerializer):
+    school_info = serializers.SerializerMethodField()
+    teacher_info = serializers.SerializerMethodField()
+    student_info = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'is_school', 'is_teacher', 'is_student', 'school_info', 'teacher_info', 'student_info']
+        extra_kwargs = {'username': {'required': False}}
+
+    def get_school_info(self, obj):
+        if obj.is_school:
+            school = School.objects.get(user=obj)
+            return {
+                'full_name': school.full_name,
+                'location': school.location
+            }
+        return None
+
+    def get_teacher_info(self, obj):
+        if obj.is_teacher:
+            teacher = Teacher.objects.get(user=obj)
+            return {
+                'first_name': teacher.first_name,
+                'last_name': teacher.last_name,
+                'school': teacher.school.full_name if teacher.school else None,
+                'grade': teacher.grade.name if teacher.grade else None
+            }
+        return None
+
+    def get_student_info(self, obj):
+        if obj.is_student:
+            student = Student.objects.get(user=obj)
+            return {
+                'first_name': student.first_name,
+                'last_name': student.last_name,
+                'school': student.school.full_name if student.school else None,
+                'grade': student.grade.name if student.grade else None
+            }
+        return None
+
+    def update(self, instance, validated_data):
+        # Update User model fields
+        for attr, value in validated_data.items():
+            if attr in ['username', 'email', 'first_name', 'last_name']:
+                setattr(instance, attr, value)
+        instance.save()
+
+        # Update related model fields
+        if instance.is_school:
+            school = School.objects.get(user=instance)
+            school_data = validated_data.get('school_info', {})
+            for attr, value in school_data.items():
+                setattr(school, attr, value)
+            school.save()
+        elif instance.is_teacher:
+            teacher = Teacher.objects.get(user=instance)
+            teacher_data = validated_data.get('teacher_info', {})
+            for attr, value in teacher_data.items():
+                setattr(teacher, attr, value)
+            teacher.save()
+        elif instance.is_student:
+            student = Student.objects.get(user=instance)
+            student_data = validated_data.get('student_info', {})
+            for attr, value in student_data.items():
+                setattr(student, attr, value)
+            student.save()
+
+        return instance
+    
 class ChannelSerializer(serializers.ModelSerializer):
+    creator = serializers.PrimaryKeyRelatedField(read_only=True)
+    
     class Meta:
         model = Channel
-        fields = ['id', 'name', 'description', 'type', 'is_visible_to_students', 'school']
+        fields = ['id', 'name', 'description', 'type', 'is_visible_to_students', 'school', 'creator']
 
 class UserSerializer(serializers.ModelSerializer):
     channels = ChannelSerializer(many=True, read_only=True)

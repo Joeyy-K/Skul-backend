@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import FileExtensionValidator
+from django.conf import settings
 
 class Channel(models.Model):
     name = models.CharField(max_length=255)
@@ -9,6 +10,7 @@ class Channel(models.Model):
     is_visible_to_students = models.BooleanField(default=True)
     school = models.ForeignKey('School', on_delete=models.CASCADE, related_name='channels')
     users = models.ManyToManyField('User', related_name='channels')
+    creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
 class User(AbstractUser):
     is_school = models.BooleanField('is_school', default=False)
@@ -88,7 +90,6 @@ class Assignment(models.Model):
     file = models.FileField(upload_to='assignments/', null=True, blank=True,
                             validators=[FileExtensionValidator(['pdf', 'doc', 'docx', 'txt'])])
     image = models.ImageField(upload_to='assignments/images/', null=True, blank=True)
-
 
 class AssignmentSubmission(models.Model):
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE)

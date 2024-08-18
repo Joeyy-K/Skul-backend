@@ -71,26 +71,6 @@ class RegisterView(APIView):
             user.is_student = True
         user.save()
         return user
-
-    def get_serializer_for_role(self, role, data):
-        if role == 'school':
-            return SchoolSerializer(data=data)
-        elif role == 'teacher':
-            return TeacherSerializer(data=data)
-        elif role == 'student':
-            return StudentSerializer(data=data)
-
-    def create_user_with_role(self, role, serializer):
-        user = serializer.save()
-        user.set_password(serializer.validated_data['user']['password'])
-        if role == 'school':
-            user.is_school = True
-        elif role == 'teacher':
-            user.is_teacher = True
-        elif role == 'student':
-            user.is_student = True
-        user.save()
-        return user
     
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class LoginView(APIView):

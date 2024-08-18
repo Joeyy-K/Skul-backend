@@ -12,9 +12,29 @@ from django.shortcuts import get_object_or_404
 from .permissions import IsEventCreator, IsSchoolAdmin
 from rest_framework.views import APIView
 from school.models import School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Event, Announcement
-from schoolauth.serializers import UserSerializer, SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, FeedbackSerializer, AttendanceSerializer, EventSerializer, AnnouncementSerializer, StudentRegistrationSerializer, TeacherRegistrationSerializer
+from schoolauth.serializers import UserSerializer, SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, FeedbackSerializer, AttendanceSerializer, EventSerializer, AnnouncementSerializer, StudentRegistrationSerializer, TeacherRegistrationSerializer, UserProfileSerializer
 
 User = get_user_model()
+
+class UserProfileView(generics.RetrieveUpdateAPIView):
+    serializer_class = UserProfileSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+class DeleteChannel(APIView):
+    def delete(self, request, channel_id):
+        try:
+            channel = Channel.objects.get(id=channel_id)
+
+            if channel.creator.id != request.user.id:
+                return Response({"error": "You don't have permission to delete this channel"}, status=status.HTTP_403_FORBIDDEN)
+            
+            channel.delete()
+            return Response({"message": "Channel deleted successfully"}, status=status.HTTP_200_OK)
+        except Channel.DoesNotExist:
+            return Response({"error": "Channel not found"}, status=status.HTTP_404_NOT_FOUND)
 
 class SchoolUsersView(generics.ListAPIView):
     serializer_class = UserSerializer
@@ -75,19 +95,16 @@ class TeacherList(generics.ListCreateAPIView):
     queryset = Teacher.objects.all()
     serializer_class = TeacherSerializer
 
-class TeacherViewSet(viewsets.ModelViewSet):
+class TeacherViewSet(generics.ListCreateAPIView):
     queryset = Teacher.objects.all()
     serializer_class = TeacherSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        user = self.request.user
-        if user.is_school:
-            school = user.school
+        school_id = self.request.query_params.get('school_id', None)
+        if school_id is not None:
+            school = get_object_or_404(School, id=school_id)
             return Teacher.objects.filter(school=school)
-        elif user.is_teacher:
-            return Teacher.objects.filter(id=user.teacher.id)
-        return Teacher.objects.none()
 
     @action(detail=True, methods=['post'])
     def transfer_student(self, request, pk=None):
@@ -134,6 +151,29 @@ class TeacherRegistration(APIView):
             teacher = serializer.save()
             return Response(TeacherSerializer(teacher).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class UnassignTeacher(APIView):
+    permission_classes = [IsSchoolAdmin]
+
+    def post(self, request, teacher_id):
+        try:
+            teacher = Teacher.objects.get(id=teacher_id)
+            teacher.grade = None
+            teacher.save()
+            return Response({"message": "Teacher unassigned from grade successfully"}, status=status.HTTP_200_OK)
+        except Teacher.DoesNotExist:
+            return Response({"error": "Teacher not found"}, status=status.HTTP_404_NOT_FOUND)
+
+class DeleteTeacher(APIView):
+    permission_classes = [IsSchoolAdmin]
+
+    def delete(self, request, teacher_id):
+        try:
+            teacher = Teacher.objects.get(id=teacher_id)
+            teacher.user.delete()
+            return Response({"message": "Teacher deleted successfully"}, status=status.HTTP_200_OK)
+        except Teacher.DoesNotExist:
+            return Response({"error": "Teacher not found"}, status=status.HTTP_404_NOT_FOUND)
     
 class StudentListByGrade(generics.ListAPIView):
     serializer_class = StudentSerializer
@@ -162,6 +202,7 @@ class StudentList(generics.ListCreateAPIView):
 
         return Student.objects.none()
     
+    
 class StudentDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Student.objects.all()
     serializer_class = StudentSerializer
@@ -176,6 +217,32 @@ class StudentRegistration(APIView):
             student = serializer.save()
             return Response(StudentSerializer(student).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class UnassignStudentFromGrade(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, student_id):
+        try:
+            student = Student.objects.get(id=student_id)
+            if request.user.is_teacher or request.user.is_school:
+                student.grade = None
+                student.save()
+                return Response({"message": "Student unassigned from grade successfully"}, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "You don't have permission to unassign students"}, status=status.HTTP_403_FORBIDDEN)
+        except Student.DoesNotExist:
+            return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
+
+class DeleteStudent(APIView):
+    permission_classes = [IsAuthenticated, IsSchoolAdmin]
+
+    def delete(self, request, student_id):
+        try:
+            student = Student.objects.get(id=student_id)
+            student.delete()
+            return Response({"message": "Student deleted successfully"}, status=status.HTTP_200_OK)
+        except Student.DoesNotExist:
+            return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
 
 class GradeStudentUpdate(APIView):
     def post(self, request, grade_id):
@@ -252,16 +319,43 @@ class RemoveStudentFromGrade(APIView):
         student.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+class DeleteGrade(APIView):
+    def delete(self, request, grade_id):
+        try:
+            grade = Grade.objects.get(id=grade_id)
+            
+            Teacher.objects.filter(grade=grade).update(grade=None)
+            
+            Student.objects.filter(grade=grade).update(grade=None)
+            
+            grade.delete()
+            return Response({"message": "Grade deleted successfully"}, status=status.HTTP_200_OK)
+        except Grade.DoesNotExist:
+            return Response({"error": "Grade not found"}, status=status.HTTP_404_NOT_FOUND)
+
 class ChannelList(generics.ListCreateAPIView):
     serializer_class = ChannelSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """
-        This view should return a list of all the channels
-        for the currently authenticated school.
+        Return a list of all the channels for the currently authenticated user's school.
         """
-        school = self.request.user.school
-        return Channel.objects.filter(school=school)
+        user = self.request.user
+        try:
+            school = user.school
+            return Channel.objects.filter(school=school).select_related('school')
+        except ObjectDoesNotExist:
+            return Channel.objects.none()
+
+    def perform_create(self, serializer):
+        """
+        Create a new channel associated with the current user's school.
+        """
+        try:
+            serializer.save(creator=self.request.user, school=self.request.user.school)
+        except ObjectDoesNotExist:
+            raise ValidationError("User is not associated with any school.")
 
 class ChannelDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Channel.objects.all()
@@ -384,13 +478,6 @@ class AnnouncementDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Announcement.objects.all()
     serializer_class = AnnouncementSerializer
 
-class ChannelList(generics.ListCreateAPIView):
-    queryset = Channel.objects.all()
-    serializer_class = ChannelSerializer
-
-class ChannelDetail(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Channel.objects.all()
-    serializer_class = ChannelSerializer   
 
 class EventList(generics.ListCreateAPIView):
     queryset = Event.objects.all()
