@@ -2,6 +2,10 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import FileExtensionValidator
 from django.conf import settings
+from django.core.files.base import ContentFile
+from PIL import Image, ImageDraw, ImageFont
+import random
+import io
 
 class Channel(models.Model):
     name = models.CharField(max_length=255)
@@ -16,6 +20,61 @@ class User(AbstractUser):
     is_school = models.BooleanField('is_school', default=False)
     is_teacher = models.BooleanField('is_teacher', default=False)
     is_student = models.BooleanField('is_student', default=False)
+    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
+ 
+    def generate_avatar(self):
+        # Generate a 128x128 image
+        img = Image.new('RGB', (128, 128), color=self.get_background_color())
+        d = ImageDraw.Draw(img)
+        
+        # Use a default font if the specified font is not available
+        try:
+            font = ImageFont.truetype("arial.ttf", 64)
+        except IOError:
+            font = ImageFont.load_default()
+        
+        initials = self.get_avatar_text()
+        
+        # Get the bounding box of the text
+        bbox = font.getbbox(initials)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        
+        # Calculate position to center the text
+        position = ((128-text_width)/2, (128-text_height)/2 - bbox[1])  # Adjust for font baseline
+        
+        # Draw the text
+        d.text(position, initials, fill=(255, 255, 255), font=font)
+        
+        # Save the image to a bytes buffer
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG')
+        
+        # Save the image to the avatar field
+        self.avatar.save(f'{self.username}_avatar.png', ContentFile(buffer.getvalue()), save=False)
+
+    def get_avatar_text(self):
+        if self.is_school:
+            return self.school.full_name[:2].upper() if hasattr(self, 'school') else 'SC'
+        elif self.is_teacher:
+            return self.teacher.first_name[0].upper() if hasattr(self, 'teacher') else 'T'
+        elif self.is_student:
+            return self.student.first_name[0].upper() if hasattr(self, 'student') else 'S'
+        else:
+            return self.username[0].upper()
+
+    def get_background_color(self):
+        # Generate a random pastel color
+        return (
+            random.randint(100, 200),
+            random.randint(100, 200),
+            random.randint(100, 200)
+        )
+
+    def save(self, *args, **kwargs):
+        if not self.avatar:
+            self.generate_avatar()
+        super().save(*args, **kwargs)
 
 class School(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE,  null=True)
@@ -115,14 +174,14 @@ class Attendance(models.Model):
     status = models.CharField(max_length=20, choices=[('present', 'Present'), ('absent', 'Absent'), ('tardy', 'Tardy')])
     notes = models.TextField(blank=True, null=True)
 
-class Event(models.Model):
+class Schedules(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
-    start_date = models.DateTimeField()
-    end_date = models.DateTimeField()
-    event_type = models.CharField(max_length=50, choices=[('assignment', 'Assignment'), ('exam', 'Exam'), ('activity', 'Activity'), ('other', 'Other')])
-    related_entities = models.ManyToManyField(Student, related_name='events', blank=True)
-    related_teachers = models.ManyToManyField(Teacher, related_name='events', blank=True)
+    file = models.FileField(upload_to='schedules/', null=True, blank=True,
+                            validators=[FileExtensionValidator(['pdf', 'doc', 'docx', 'txt'])])
+    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='schedules') 
+    creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_schedules')
+
 
 class Announcement(models.Model):
     title = models.CharField(max_length=255)

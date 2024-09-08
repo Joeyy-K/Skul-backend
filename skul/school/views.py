@@ -11,8 +11,8 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from .permissions import IsEventCreator, IsSchoolAdmin
 from rest_framework.views import APIView
-from school.models import School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Event, Announcement
-from schoolauth.serializers import UserSerializer, SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, FeedbackSerializer, AttendanceSerializer, EventSerializer, AnnouncementSerializer, StudentRegistrationSerializer, TeacherRegistrationSerializer, UserProfileSerializer
+from school.models import School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Schedules, Announcement
+from schoolauth.serializers import UserSerializer, SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, FeedbackSerializer, AttendanceSerializer, SchedulesSerializer, AnnouncementSerializer, StudentRegistrationSerializer, TeacherRegistrationSerializer, UserProfileSerializer
 
 User = get_user_model()
 
@@ -69,8 +69,6 @@ class UserListView(generics.ListAPIView):
             queryset = queryset.filter(first_name__icontains=search) | queryset.filter(last_name__icontains=search)
         return queryset
 
-
-
 class SchoolList(generics.ListCreateAPIView):
     queryset = School.objects.all()
     serializer_class = SchoolSerializer
@@ -95,6 +93,13 @@ class TeacherList(generics.ListCreateAPIView):
     queryset = Teacher.objects.all()
     serializer_class = TeacherSerializer
 
+from rest_framework import generics, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
+from django.core.exceptions import ObjectDoesNotExist, ValidationError, PermissionDenied
+
 class TeacherViewSet(generics.ListCreateAPIView):
     queryset = Teacher.objects.all()
     serializer_class = TeacherSerializer
@@ -104,7 +109,23 @@ class TeacherViewSet(generics.ListCreateAPIView):
         school_id = self.request.query_params.get('school_id', None)
         if school_id is not None:
             school = get_object_or_404(School, id=school_id)
-            return Teacher.objects.filter(school=school)
+            return Teacher.objects.filter(school=school).select_related('user', 'school')
+        return Teacher.objects.none()
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
     def transfer_student(self, request, pk=None):
@@ -138,7 +159,7 @@ class TeacherViewSet(generics.ListCreateAPIView):
             student.user.channel = new_school.channel
             student.user.save()
 
-        serializer = StudentSerializer(student)
+        serializer = StudentSerializer(student, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
     
 class TeacherRegistration(APIView):
@@ -201,8 +222,7 @@ class StudentList(generics.ListCreateAPIView):
             return queryset.select_related('school', 'grade')
 
         return Student.objects.none()
-    
-    
+
 class StudentDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Student.objects.all()
     serializer_class = StudentSerializer
@@ -452,44 +472,28 @@ class AttendanceByStudent(generics.ListAPIView):
         student_id = self.kwargs['student_id']
         return Attendance.objects.filter(student_id=student_id)
     
-class EventList(generics.ListCreateAPIView):
-    queryset = Event.objects.all()
-    serializer_class = EventSerializer
-
-class EventDetail(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Event.objects.all()
-    serializer_class = EventSerializer
-
-class EventsByEntity(generics.ListAPIView):
-    serializer_class = EventSerializer
+class ScheduleListCreateView(generics.ListCreateAPIView):
+    serializer_class = SchedulesSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        entity_type = self.request.query_params.get('entity_type', None)
-        entity_id = self.request.query_params.get('entity_id', None)
+        return Schedules.objects.filter(school=self.request.user.school)
 
-        if entity_type == 'student':
-            return Event.objects.filter(related_entities__id=entity_id)
-        elif entity_type == 'teacher':
-            return Event.objects.filter(related_teachers__id=entity_id)
-        else:
-            return Event.objects.none()
+    def perform_create(self, serializer):
+        serializer.save(creator=self.request.user, school=self.request.user.school)
+
+class ScheduleRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = SchedulesSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Schedules.objects.filter(school=self.request.user.school)
+
 
 class AnnouncementDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Announcement.objects.all()
     serializer_class = AnnouncementSerializer
 
-
-class EventList(generics.ListCreateAPIView):
-    queryset = Event.objects.all()
-    serializer_class = EventSerializer
-
-    def get_permissions(self):
-        if self.request.method == 'POST':
-            return [IsEventCreator()]
-        return [IsAuthenticated()]
-
-    def perform_create(self, serializer):
-        serializer.save(creator=self.request.user)
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication

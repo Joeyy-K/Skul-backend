@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from school.models import User, School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Event, Announcement
+from school.models import User, School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Schedules, Announcement
+from django.conf import settings
 
 class UserProfileSerializer(serializers.ModelSerializer):
     school_info = serializers.SerializerMethodField()
@@ -78,13 +79,26 @@ class ChannelSerializer(serializers.ModelSerializer):
         model = Channel
         fields = ['id', 'name', 'description', 'type', 'is_visible_to_students', 'school', 'creator']
 
+from django.conf import settings
+
 class UserSerializer(serializers.ModelSerializer):
     channels = ChannelSerializer(many=True, read_only=True)
+    avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'is_school', 'is_teacher', 'is_student', 'channels']
+        fields = ['id', 'username', 'email', 'is_school', 'is_teacher', 'is_student', 'channels', 'avatar_url']
         extra_kwargs = {'password': {'write_only': True}}
+
+    def get_avatar_url(self, obj):
+        if obj.avatar:
+            request = self.context.get('request')
+            if request is not None:
+                return request.build_absolute_uri(obj.avatar.url)
+            else:
+                # Fallback to using the base URL from settings
+                return f"{settings.BASE_URL}{obj.avatar.url}"
+        return None
 
     def create(self, validated_data):
         user = User(**validated_data)
@@ -108,11 +122,11 @@ class SchoolSerializer(serializers.ModelSerializer):
         return user
 
 class TeacherSerializer(serializers.ModelSerializer):
-    user = UserSerializer()
+    user = UserSerializer(read_only=True)
 
     class Meta:
         model = Teacher
-        fields = ['id', 'user', 'first_name', 'last_name', 'school', 'grade']
+        fields = ['id', 'user', 'first_name', 'last_name', 'school', 'grade', 'user']
 
     def create(self, validated_data):
         user_data = validated_data.pop('user')
@@ -266,7 +280,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
         model = Attendance
         fields = ['id', 'student', 'date', 'status', 'notes']       
 
-class EventSerializer(serializers.ModelSerializer):
+class SchedulesSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Event
-        fields = ['id', 'title', 'description', 'start_date', 'end_date', 'event_type', 'related_entities', 'related_teachers']
+        model = Schedules
+        fields = ['id', 'title', 'description', 'file', 'school', 'creator']

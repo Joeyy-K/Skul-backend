@@ -1,5 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from django.conf import settings
+from django.conf.urls.static import static
 from . import views
 
 router = DefaultRouter()
@@ -56,10 +58,6 @@ urlpatterns = [
     path('attendance/<int:pk>/', views.AttendanceDetail.as_view(), name='attendance-detail'),
 
     path('students/<int:student_id>/attendance/', views.AttendanceByStudent.as_view(), name='attendance-by-student'),
-    
-    path('events/', views.EventList.as_view(), name='event-list'),
-    path('events/<int:pk>/', views.EventDetail.as_view(), name='event-detail'),
-    path('events/by-entity/', views.EventsByEntity.as_view(), name='events-by-entity'),
 
     path('announcements/', views.AnnouncementList.as_view({'get': 'list', 'post': 'create'}), name='announcement-list'),
     path('announcements/<int:pk>/', views.AnnouncementList.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='announcement-detail'),
@@ -68,6 +66,9 @@ urlpatterns = [
     
     path('channels/', views.ChannelList.as_view(), name='channel-list'),
     path('channels/<int:pk>/', views.ChannelDetail.as_view(), name='channel-detail'),
+
+    path('schedules/', views.ScheduleListCreateView.as_view(), name='schedule-list-create'),
+    path('schedules/<int:pk>/', views.ScheduleRetrieveUpdateDestroyView.as_view(), name='schedule-detail'),
     path('', include(router.urls)),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
