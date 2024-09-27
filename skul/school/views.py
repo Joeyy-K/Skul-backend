@@ -10,9 +10,11 @@ from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from .permissions import IsEventCreator, IsSchoolAdmin
+from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from rest_framework.views import APIView
-from school.models import School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Schedules, Announcement
-from schoolauth.serializers import UserSerializer, SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, FeedbackSerializer, AttendanceSerializer, SchedulesSerializer, AnnouncementSerializer, StudentRegistrationSerializer, TeacherRegistrationSerializer, UserProfileSerializer
+from school.models import School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Schedules
+from schoolauth.serializers import UserSerializer, SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, AssignmentSubmissionStatusSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, FeedbackSerializer, AttendanceSerializer, SchedulesSerializer, StudentRegistrationSerializer, TeacherRegistrationSerializer, UserProfileSerializer
 
 User = get_user_model()
 
@@ -179,8 +181,16 @@ class UnassignTeacher(APIView):
     def post(self, request, teacher_id):
         try:
             teacher = Teacher.objects.get(id=teacher_id)
+
+            grade = teacher.grade
+            
+            if grade:
+                grade.teacher = None
+                grade.save()
+    
             teacher.grade = None
             teacher.save()
+            
             return Response({"message": "Teacher unassigned from grade successfully"}, status=status.HTTP_200_OK)
         except Teacher.DoesNotExist:
             return Response({"error": "Teacher not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -264,30 +274,131 @@ class DeleteStudent(APIView):
         except Student.DoesNotExist:
             return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
 
+class UnassignStudentFromGrade(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, student_id):
+        try:
+            student = Student.objects.get(id=student_id)
+            if request.user.is_teacher or request.user.is_school:
+                if student.grade:
+                    old_grade = student.grade
+                    student.grade = None
+                    student.save()
+                    return Response({
+                        "message": f"Student '{student.full_name}' unassigned from grade '{old_grade.name}' successfully"
+                    }, status=status.HTTP_200_OK)
+                else:
+                    return Response({
+                        "message": f"Student '{student.full_name}' is not currently assigned to any grade"
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({
+                    "error": "You don't have permission to unassign students"
+                }, status=status.HTTP_403_FORBIDDEN)
+        except Student.DoesNotExist:
+            return Response({
+                "error": f"Student with id {student_id} not found"
+            }, status=status.HTTP_404_NOT_FOUND)
+
+class GradeTeacherUpdate(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, grade_id):
+        grade = get_object_or_404(Grade, id=grade_id)
+        teacher_id = request.data.get('teacher_id')
+
+        if not teacher_id:
+            return Response({
+                "error": "Teacher ID is required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        teacher = get_object_or_404(Teacher, id=teacher_id)
+
+        if grade.teacher:
+            if grade.teacher == teacher:
+                return Response({
+                    "message": f"Teacher '{teacher.first_name} {teacher.last_name}' is already assigned to grade '{grade.name}'"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            old_teacher = grade.teacher
+            old_teacher.grade = None
+            old_teacher.save()
+
+        if teacher.grade:
+            return Response({
+                "error": f"Teacher '{teacher.first_name} {teacher.last_name}' is already assigned to grade '{teacher.grade.name}'"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        grade.teacher = teacher
+        grade.save()
+        
+        return Response({
+            "message": f"Teacher '{teacher.first_name} {teacher.last_name}' successfully assigned to grade '{grade.name}'"
+        }, status=status.HTTP_200_OK)
+
 class GradeStudentUpdate(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request, grade_id):
         grade = get_object_or_404(Grade, id=grade_id)
         student_id = request.data.get('student_id')
+
+        if not student_id:
+            return Response({
+                "error": "Student ID is required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         student = get_object_or_404(Student, id=student_id)
-        student.grade = grade 
+
+        if student.grade:
+            if student.grade == grade:
+                return Response({
+                    "message": f"Student '{student.full_name}' is already assigned to grade '{grade.name}'"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            old_grade = student.grade
+
+        student.grade = grade
         student.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+
+        return Response({
+            "message": f"Student '{student.full_name}' successfully assigned to grade '{grade.name}'"
+            + (f" (previously in grade '{old_grade.name}')" if 'old_grade' in locals() else "")
+        }, status=status.HTTP_200_OK)
+
 
 class AssignmentList(generics.ListCreateAPIView):
     serializer_class = AssignmentSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """
-        This view should return a list of all the assignments
-        for the currently authenticated teacher.
-        """
         user = self.request.user
-        if user.is_authenticated:
-            teacher = user.teacher
-            return Assignment.objects.filter(teacher=teacher)
+        
+        if hasattr(user, 'teacher'):
+            # User is a teacher
+            return Assignment.objects.filter(teacher=user.teacher)
+        elif hasattr(user, 'student'):
+            # User is a student
+            student = user.student
+            if student.grade:
+                return Assignment.objects.filter(grade=student.grade)
+            else:
+                # If the student doesn't have a grade assigned, return an empty queryset
+                return Assignment.objects.none()
         else:
-            return Assignment.objects.none()  
+            # User is neither a teacher nor a student
+            return Assignment.objects.none()
 
+    def perform_create(self, serializer):
+        user = self.request.user
+        if hasattr(user, 'teacher'):
+            serializer.save(teacher=user.teacher)
+        else:
+            raise PermissionDenied("Only teachers can create assignments.")
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 class AssignmentDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Assignment.objects.all()
@@ -300,6 +411,36 @@ class AssignmentSubmissionList(generics.ListCreateAPIView):
 class AssignmentSubmissionDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = AssignmentSubmission.objects.all()
     serializer_class = AssignmentSubmissionSerializer
+
+class AssignmentSubmissionStatusView(generics.RetrieveAPIView):
+    queryset = Assignment.objects.all()
+    serializer_class = AssignmentSubmissionStatusSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        assignment = self.get_object()
+        grade = assignment.grade
+        students = Student.objects.filter(grade=grade)
+
+        student_data = []
+        for student in students:
+            submission = AssignmentSubmission.objects.filter(assignment=assignment, student=student).first()
+            student_data.append({
+                'id': student.id,
+                'first_name': student.first_name,
+                'last_name': student.last_name,
+                'has_submitted': submission is not None,
+                'submission_date': submission.submission_date if submission else None
+            })
+
+        serializer = self.get_serializer({
+            'id': assignment.id,
+            'title': assignment.title,
+            'description': assignment.description,
+            'due_date': assignment.due_date,
+            'students': student_data
+        })
+
+        return Response(serializer.data)
 
 class GradeList(generics.ListCreateAPIView):
     queryset = Grade.objects.all()
@@ -321,14 +462,6 @@ class GradeDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Grade.objects.all()
     serializer_class = GradeSerializer
 
-class GradeTeacherUpdate(APIView):
-    def post(self, request, grade_id):
-        grade = get_object_or_404(Grade, id=grade_id)
-        teacher_id = request.data.get('teacher_id')
-        teacher = get_object_or_404(Teacher, id=teacher_id)
-        grade.teacher = teacher
-        grade.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
     
 class RemoveStudentFromGrade(APIView):
     def post(self, request, grade_id):
@@ -477,10 +610,35 @@ class ScheduleListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Schedules.objects.filter(school=self.request.user.school)
+        user = self.request.user
+        if hasattr(user, 'school'):
+            return Schedules.objects.filter(school=user.school)
+        elif hasattr(user, 'teacher'):
+            return Schedules.objects.filter(school=user.teacher.school)
+        elif hasattr(user, 'student'):
+            return Schedules.objects.filter(school=user.student.school)
+        else:
+            return Schedules.objects.none()
 
     def perform_create(self, serializer):
-        serializer.save(creator=self.request.user, school=self.request.user.school)
+        file = self.request.data.get('file')
+        if file:
+            try:
+                FileExtensionValidator(['pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png'])(file)
+            except ValidationError as e:
+                raise ValidationError({'file': e.messages})
+
+        user = self.request.user
+        if hasattr(user, 'school'):
+            school = user.school
+        elif hasattr(user, 'teacher'):
+            school = user.teacher.school
+        elif hasattr(user, 'student'):
+            school = user.student.school
+        else:
+            raise ValidationError({'school': 'User is not associated with any school.'})
+
+        serializer.save(creator=user, school=school)
 
 class ScheduleRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = SchedulesSerializer
@@ -488,32 +646,6 @@ class ScheduleRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return Schedules.objects.filter(school=self.request.user.school)
-
-
-class AnnouncementDetail(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Announcement.objects.all()
-    serializer_class = AnnouncementSerializer
-
-
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import TokenAuthentication
-
-class AnnouncementList(viewsets.ModelViewSet):
-    serializer_class = AnnouncementSerializer
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        user = self.request.user
-        if user.is_authenticated:
-            if user.is_student:
-                return Announcement.objects.all()
-            elif user.is_teacher or user.is_school:
-                return Announcement.objects.all()
-        return Announcement.objects.none()
-
-    def perform_create(self, serializer):
-        serializer.save(creator=self.request.user)
 
 class AttendanceList(generics.ListCreateAPIView):
     queryset = Attendance.objects.all()

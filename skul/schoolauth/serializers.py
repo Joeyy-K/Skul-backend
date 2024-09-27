@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from school.models import User, School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Schedules, Announcement
+from school.models import User, School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Schedules
 from django.conf import settings
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -235,12 +235,27 @@ class StudentRegistrationSerializer(serializers.Serializer):
 class AssignmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Assignment
-        fields = ['id', 'title', 'description', 'due_date', 'teacher', 'file', 'grade' ]
+        fields = ['id', 'title', 'description', 'due_date', 'teacher', 'grade', 'file']
 
 class AssignmentSubmissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AssignmentSubmission
-        fields = ['id', 'assignment', 'student', 'submission_date', 'file']
+        fields = ['id', 'assignment', 'student', 'submission_date', 'file', 'student_name']
+
+class StudentSubmissionStatusSerializer(serializers.ModelSerializer):
+    has_submitted = serializers.BooleanField()
+    submission_date = serializers.DateTimeField()
+
+    class Meta:
+        model = Student
+        fields = ['id', 'first_name', 'last_name', 'has_submitted', 'submission_date']
+
+class AssignmentSubmissionStatusSerializer(serializers.ModelSerializer):
+    students = StudentSubmissionStatusSerializer(many=True)
+
+    class Meta:
+        model = Assignment
+        fields = ['id', 'title', 'description', 'due_date', 'students']
 
 class GradeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -260,11 +275,6 @@ class GradeSerializer(serializers.ModelSerializer):
 
         return grade
 
-class AnnouncementSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Announcement
-        fields = ['id', 'title', 'content', 'publish_date', 'school', 'attachment']
-
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
@@ -283,4 +293,4 @@ class AttendanceSerializer(serializers.ModelSerializer):
 class SchedulesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Schedules
-        fields = ['id', 'title', 'description', 'file', 'school', 'creator']
+        fields = ['id', 'title', 'description', 'file', 'school', 'creator', 'publish_date' ]

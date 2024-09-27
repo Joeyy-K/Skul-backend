@@ -32,6 +32,7 @@ urlpatterns = [
     path('assignments/<int:pk>/', views.AssignmentDetail.as_view()),
     path('assignment-submissions/', views.AssignmentSubmissionList.as_view()),
     path('assignment-submissions/<int:pk>/', views.AssignmentSubmissionDetail.as_view()),
+    path('assignments/<int:pk>/submission-status/', views.AssignmentSubmissionStatusView.as_view(), name='assignment-submission-status'),
 
     path('grades/', views.GradeList.as_view()),
     path('grades/<int:pk>/', views.GradeDetail.as_view()),
@@ -58,9 +59,6 @@ urlpatterns = [
     path('attendance/<int:pk>/', views.AttendanceDetail.as_view(), name='attendance-detail'),
 
     path('students/<int:student_id>/attendance/', views.AttendanceByStudent.as_view(), name='attendance-by-student'),
-
-    path('announcements/', views.AnnouncementList.as_view({'get': 'list', 'post': 'create'}), name='announcement-list'),
-    path('announcements/<int:pk>/', views.AnnouncementList.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='announcement-detail'),
 
     path('feedbacks/<int:feedback_id>/delete/', views.delete_feedback, name='delete_feedback'),
     

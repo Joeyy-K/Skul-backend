@@ -110,6 +110,9 @@ class Grade(models.Model):
         if self.teacher:
             self.teacher.grade = self
             self.teacher.save()
+        else:
+            # If no teacher is assigned, ensure any previously assigned teacher is updated
+            Teacher.objects.filter(grade=self).update(grade=None)
 
     @property
     def student_count(self):
@@ -130,31 +133,31 @@ class Student(models.Model):
         return f"{self.first_name} {self.last_name}"
 
 class Assignment(models.Model):
-    GRADE_CHOICES = [
-        ('1', 'First Grade'),
-        ('2', 'Second Grade'),
-        ('3', 'Third Grade'),
-        ('4', 'Fourth Grade'),
-        ('5', 'Fifth Grade'),
-        ('6', 'Sixth Grade'),
-        ('7', 'Seventh Grade'),
-        ('8', 'Eighth Grade'),
-    ]
-
     title = models.CharField(max_length=255)
     description = models.TextField()
     due_date = models.DateTimeField()
-    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE)
-    grade = models.CharField(max_length=2, choices=GRADE_CHOICES, null=True)
-    file = models.FileField(upload_to='assignments/', null=True, blank=True,
-                            validators=[FileExtensionValidator(['pdf', 'doc', 'docx', 'txt'])])
+    teacher = models.ForeignKey('Teacher', on_delete=models.CASCADE)
+    grade = models.ForeignKey('Grade', on_delete=models.CASCADE)
+    file = models.FileField(
+        upload_to='assignements/',
+        null=True,
+        blank=True,
+        validators=[FileExtensionValidator(['pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png'])]
+    )
     image = models.ImageField(upload_to='assignments/images/', null=True, blank=True)
+
+    def __str__(self):
+        return self.title
 
 class AssignmentSubmission(models.Model):
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE)
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     submission_date = models.DateTimeField(auto_now_add=True)
     file = models.FileField(upload_to='assignments/')
+
+    @property
+    def student_name(self):
+        return self.student.full_name
 
 class Message(models.Model):
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
@@ -177,17 +180,12 @@ class Attendance(models.Model):
 class Schedules(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
-    file = models.FileField(upload_to='schedules/', null=True, blank=True,
-                            validators=[FileExtensionValidator(['pdf', 'doc', 'docx', 'txt'])])
+    publish_date = models.DateTimeField(auto_now_add=True)
+    file = models.FileField(
+        upload_to='schedules/',
+        null=True,
+        blank=True,
+        validators=[FileExtensionValidator(['pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png'])]
+    )
     school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='schedules') 
     creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_schedules')
-
-
-class Announcement(models.Model):
-    title = models.CharField(max_length=255)
-    content = models.TextField()
-    publish_date = models.DateTimeField(auto_now_add=True)
-    attachment = models.FileField(upload_to='announcements/', blank=True, null=True)
-    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='announcements') 
-    creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_announcements')
-
