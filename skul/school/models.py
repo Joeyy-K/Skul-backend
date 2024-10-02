@@ -100,6 +100,14 @@ class Teacher(models.Model):
     school = models.ForeignKey(School, on_delete=models.CASCADE)
     grade = models.OneToOneField('Grade', on_delete=models.SET_NULL, null=True, blank=True, related_name='grade_teacher')
 
+    @property
+    def school_name(self):
+        return self.school.full_name
+    
+    @property
+    def grade_name(self):
+        return self.grade.name
+
 class Grade(models.Model):
     name = models.CharField(max_length=255)
     school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='grades')
@@ -113,6 +121,14 @@ class Grade(models.Model):
         else:
             # If no teacher is assigned, ensure any previously assigned teacher is updated
             Teacher.objects.filter(grade=self).update(grade=None)
+
+    @property
+    def school_name(self):
+        return self.school.full_name
+    
+    @property
+    def teacher_name(self):
+        return self.teacher.first_name + " " + self.teacher.last_name
 
     @property
     def student_count(self):

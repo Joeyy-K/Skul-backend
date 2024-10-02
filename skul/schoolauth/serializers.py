@@ -126,7 +126,7 @@ class TeacherSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Teacher
-        fields = ['id', 'user', 'first_name', 'last_name', 'school', 'grade', 'user']
+        fields = ['id', 'user', 'first_name', 'last_name', 'school', 'grade', 'user', 'school_name', 'grade_name']
 
     def create(self, validated_data):
         user_data = validated_data.pop('user')
@@ -260,7 +260,7 @@ class AssignmentSubmissionStatusSerializer(serializers.ModelSerializer):
 class GradeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Grade
-        fields = ['id', 'name', 'school', 'teacher']
+        fields = ['id', 'name', 'school', 'teacher', 'school_name', 'teacher_name']
 
     def create(self, validated_data):
         school_data = validated_data.pop('school', None)
