@@ -4,9 +4,6 @@ from django.conf import settings
 from django.conf.urls.static import static
 from . import views
 
-router = DefaultRouter()
-router.register(r'feedbacks', views.FeedbackViewSet)
-
 urlpatterns = [
     path('users/', views.UserListView.as_view(), name='user-list'),
 
@@ -44,7 +41,7 @@ urlpatterns = [
 
     path('channels/', views.ChannelList.as_view(), name='channel-list'),
     path('channels/user/', views.UserChannelListView.as_view(), name='user-channels'),
-    path('channels1/create/', views.ChannelCreate.as_view(), name='channel-create'),
+    path('channels/create/', views.ChannelCreate.as_view(), name='channel-create'),
     path('channels/<int:pk>/', views.ChannelDetail.as_view(), name='channel-detail'),
     path('channels/<int:channel_id>/delete/', views.DeleteChannel.as_view(), name='delete-channel'),
 
@@ -52,21 +49,9 @@ urlpatterns = [
     path('channels/<int:channel_id>/messages/', views.MessageListView.as_view(), name='message-list'),
     path('channels/<int:channel_id>/messages/create/', views.MessageCreateView.as_view(), name='message-create'),
     path('channels/<int:channel_id>/add_user/<int:user_id>/', views.AddUserToChannelView.as_view(), name='add-user-to-channel'),
-
     path('messages/', views.MessageListView.as_view(), name='message-list'), 
-
-    path('attendance/', views.AttendanceList.as_view(), name='attendance-list'),
-    path('attendance/<int:pk>/', views.AttendanceDetail.as_view(), name='attendance-detail'),
-
-    path('students/<int:student_id>/attendance/', views.AttendanceByStudent.as_view(), name='attendance-by-student'),
-
-    path('feedbacks/<int:feedback_id>/delete/', views.delete_feedback, name='delete_feedback'),
-    
-    path('channels/', views.ChannelList.as_view(), name='channel-list'),
-    path('channels/<int:pk>/', views.ChannelDetail.as_view(), name='channel-detail'),
 
     path('schedules/', views.ScheduleListCreateView.as_view(), name='schedule-list-create'),
     path('schedules/<int:pk>/', views.ScheduleRetrieveUpdateDestroyView.as_view(), name='schedule-detail'),
-    path('', include(router.urls)),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

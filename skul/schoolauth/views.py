@@ -10,7 +10,7 @@ from django.contrib import auth
 from django.contrib.auth import authenticate, login
 from rest_framework.authtoken.models import Token
 from school.models import User, School, Student, Teacher
-from .serializers import UserSerializer, SchoolSerializer, TeacherSerializer, StudentSerializer
+from .serializers import SchoolSerializer, TeacherSerializer, StudentSerializer
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class RegisterView(APIView):

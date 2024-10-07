@@ -1,20 +1,18 @@
-from django.http import JsonResponse
 from django.db.models import Prefetch, Q
-from django.db import transaction
 from rest_framework import generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist, ValidationError, PermissionDenied
-from rest_framework import status, viewsets
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
-from .permissions import IsEventCreator, IsSchoolAdmin
+from .permissions import IsSchoolAdmin
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
 from rest_framework.views import APIView
-from school.models import School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Schedules
-from schoolauth.serializers import UserSerializer, SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, AssignmentSubmissionStatusSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, FeedbackSerializer, AttendanceSerializer, SchedulesSerializer, StudentRegistrationSerializer, TeacherRegistrationSerializer, UserProfileSerializer
+from school.models import School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Schedules
+from schoolauth.serializers import UserSerializer, SchoolSerializer, TeacherSerializer, StudentSerializer, AssignmentSerializer,AssignmentSubmissionSerializer, AssignmentSubmissionStatusSerializer, GradeSerializer, ChannelSerializer, MessageSerializer, SchedulesSerializer, StudentRegistrationSerializer, TeacherRegistrationSerializer, UserProfileSerializer
 
 User = get_user_model()
 
@@ -55,10 +53,6 @@ class UserListView(generics.ListAPIView):
     serializer_class = UserSerializer
 
     def get_queryset(self):
-        """
-        Optionally restricts the returned users,
-        by filtering against a `category` query parameter in the URL.
-        """
         queryset = User.objects.all()
         category = self.request.query_params.get('category', None)
         search = self.request.query_params.get('search', None)
@@ -94,13 +88,6 @@ class SchoolDetail(generics.RetrieveUpdateDestroyAPIView):
 class TeacherList(generics.ListCreateAPIView):
     queryset = Teacher.objects.all()
     serializer_class = TeacherSerializer
-
-from rest_framework import generics, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from django.shortcuts import get_object_or_404
-from django.core.exceptions import ObjectDoesNotExist, ValidationError, PermissionDenied
 
 class TeacherViewSet(generics.ListCreateAPIView):
     queryset = Teacher.objects.all()
@@ -365,7 +352,6 @@ class GradeStudentUpdate(APIView):
             + (f" (previously in grade '{old_grade.name}')" if 'old_grade' in locals() else "")
         }, status=status.HTTP_200_OK)
 
-
 class AssignmentList(generics.ListCreateAPIView):
     serializer_class = AssignmentSerializer
     permission_classes = [IsAuthenticated]
@@ -374,18 +360,14 @@ class AssignmentList(generics.ListCreateAPIView):
         user = self.request.user
         
         if hasattr(user, 'teacher'):
-            # User is a teacher
             return Assignment.objects.filter(teacher=user.teacher)
         elif hasattr(user, 'student'):
-            # User is a student
             student = user.student
             if student.grade:
                 return Assignment.objects.filter(grade=student.grade)
             else:
-                # If the student doesn't have a grade assigned, return an empty queryset
                 return Assignment.objects.none()
         else:
-            # User is neither a teacher nor a student
             return Assignment.objects.none()
 
     def perform_create(self, serializer):
@@ -461,8 +443,7 @@ class GradeList(generics.ListCreateAPIView):
 class GradeDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Grade.objects.all()
     serializer_class = GradeSerializer
-
-    
+ 
 class RemoveStudentFromGrade(APIView):
     def post(self, request, grade_id):
         grade = get_object_or_404(Grade, id=grade_id)
@@ -491,9 +472,6 @@ class ChannelList(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """
-        Return a list of all the channels for the currently authenticated user's school.
-        """
         user = self.request.user
         try:
             school = user.school
@@ -502,9 +480,6 @@ class ChannelList(generics.ListCreateAPIView):
             return Channel.objects.none()
 
     def perform_create(self, serializer):
-        """
-        Create a new channel associated with the current user's school.
-        """
         try:
             serializer.save(creator=self.request.user, school=self.request.user.school)
         except ObjectDoesNotExist:
@@ -570,40 +545,6 @@ class MessageCreateView(APIView):
             serializer.save(sender=request.user, channel=channel)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class FeedbackViewSet(viewsets.ModelViewSet):
-    queryset = Feedback.objects.all()
-    serializer_class = FeedbackSerializer
-
-    def get_queryset(self):
-        user = self.request.user
-        if user.is_authenticated:
-            if user.is_student:
-                return Feedback.objects.filter(visible_to_students=True)
-            elif user.is_teacher or user.is_school:
-                return Feedback.objects.all()
-        return Feedback.objects.none()
-
-    def perform_create(self, serializer):
-        if self.request.user.is_teacher:
-            serializer.save(sender=self.request.user, visible_to_students=False)
-        else:
-            serializer.save(sender=self.request.user)
-
-def delete_feedback(request, feedback_id):
-    if request.method == 'DELETE':
-        feedback = get_object_or_404(Feedback, id=feedback_id)
-        feedback.delete()
-        return JsonResponse({'message': 'Feedback deleted successfully.'})
-    else:
-        return JsonResponse({'error': 'Invalid method'})
-
-class AttendanceByStudent(generics.ListAPIView):
-    serializer_class = AttendanceSerializer
-
-    def get_queryset(self):
-        student_id = self.kwargs['student_id']
-        return Attendance.objects.filter(student_id=student_id)
     
 class ScheduleListCreateView(generics.ListCreateAPIView):
     serializer_class = SchedulesSerializer
@@ -647,30 +588,3 @@ class ScheduleRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         return Schedules.objects.filter(school=self.request.user.school)
 
-class AttendanceList(generics.ListCreateAPIView):
-    queryset = Attendance.objects.all()
-    serializer_class = AttendanceSerializer
-
-    def get_queryset(self):
-        user = self.request.user
-        if user.is_teacher:
-            return Attendance.objects.filter(student__school=user.teacher.school)
-        elif user.is_student:
-            return Attendance.objects.filter(student=user.student)
-        return Attendance.objects.none()
-
-    def perform_create(self, serializer):
-        serializer.save(teacher=self.request.user.teacher)
-
-class AttendanceDetail(generics.RetrieveAPIView):
-    queryset = Attendance.objects.all()
-    serializer_class = AttendanceSerializer
-
-    def get_object(self):
-        attendance = super().get_object()
-        user = self.request.user
-        if user.is_student and attendance.student == user.student:
-            return attendance
-        elif user.is_teacher and attendance.student.school == user.teacher.school:
-            return attendance
-        raise PermissionDenied("You don't have permission to access this attendance record.")

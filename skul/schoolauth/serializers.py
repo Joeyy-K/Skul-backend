@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from school.models import User, School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Schedules
+from school.models import User, School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Schedules
 from django.conf import settings
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -44,13 +44,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return None
 
     def update(self, instance, validated_data):
-        # Update User model fields
         for attr, value in validated_data.items():
             if attr in ['username', 'email', 'first_name', 'last_name']:
                 setattr(instance, attr, value)
         instance.save()
 
-        # Update related model fields
         if instance.is_school:
             school = School.objects.get(user=instance)
             school_data = validated_data.get('school_info', {})
@@ -278,17 +276,7 @@ class GradeSerializer(serializers.ModelSerializer):
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
-        fields = ['id', 'sender', 'channel', 'content', 'timestamp']
-
-class FeedbackSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Feedback
-        fields = ['content', 'sender', 'receiver', 'visible_to_students']
-
-class AttendanceSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Attendance
-        fields = ['id', 'student', 'date', 'status', 'notes']       
+        fields = ['id', 'sender', 'channel', 'content', 'timestamp']    
 
 class SchedulesSerializer(serializers.ModelSerializer):
     class Meta:

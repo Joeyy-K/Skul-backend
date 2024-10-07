@@ -23,11 +23,10 @@ class User(AbstractUser):
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
  
     def generate_avatar(self):
-        # Generate a 128x128 image
+        # note: Generates a 128x128 image
         img = Image.new('RGB', (128, 128), color=self.get_background_color())
         d = ImageDraw.Draw(img)
         
-        # Use a default font if the specified font is not available
         try:
             font = ImageFont.truetype("arial.ttf", 64)
         except IOError:
@@ -35,22 +34,18 @@ class User(AbstractUser):
         
         initials = self.get_avatar_text()
         
-        # Get the bounding box of the text
         bbox = font.getbbox(initials)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
         
-        # Calculate position to center the text
         position = ((128-text_width)/2, (128-text_height)/2 - bbox[1])  # Adjust for font baseline
         
-        # Draw the text
         d.text(position, initials, fill=(255, 255, 255), font=font)
         
-        # Save the image to a bytes buffer
+        # note: it saves the image to a bytes buffer
         buffer = io.BytesIO()
         img.save(buffer, format='PNG')
         
-        # Save the image to the avatar field
         self.avatar.save(f'{self.username}_avatar.png', ContentFile(buffer.getvalue()), save=False)
 
     def get_avatar_text(self):
@@ -64,7 +59,6 @@ class User(AbstractUser):
             return self.username[0].upper()
 
     def get_background_color(self):
-        # Generate a random pastel color
         return (
             random.randint(100, 200),
             random.randint(100, 200),
@@ -119,7 +113,7 @@ class Grade(models.Model):
             self.teacher.grade = self
             self.teacher.save()
         else:
-            # If no teacher is assigned, ensure any previously assigned teacher is updated
+            #to note: If no teacher is assigned, ensure any previously assigned teacher is updated
             Teacher.objects.filter(grade=self).update(grade=None)
 
     @property
@@ -180,18 +174,6 @@ class Message(models.Model):
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name='channel_messages', null=True)
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
-
-class Feedback(models.Model):
-    content = models.TextField()
-    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_feedbacks')
-    receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_feedbacks')
-    visible_to_students = models.BooleanField(default=True)
-
-class Attendance(models.Model):
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='attendance')
-    date = models.DateField()
-    status = models.CharField(max_length=20, choices=[('present', 'Present'), ('absent', 'Absent'), ('tardy', 'Tardy')])
-    notes = models.TextField(blank=True, null=True)
 
 class Schedules(models.Model):
     title = models.CharField(max_length=255)
