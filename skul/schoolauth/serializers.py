@@ -109,18 +109,16 @@ class SchoolSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = School
-        fields = [ 'id', 'user', 'full_name', 'location']
+        fields = ['id', 'user', 'full_name', 'location']
 
     def create(self, validated_data):
         user_data = validated_data.pop('user')
-        user = User(**user_data)
-        user.set_password(user_data['password'])
-        user.save()
-        School.objects.create(user=user, **validated_data)
-        return user
+        user = User.objects.create_user(**user_data)
+        school = School.objects.create(user=user, **validated_data)
+        return school
 
 class TeacherSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
+    user = UserSerializer()
 
     class Meta:
         model = Teacher
@@ -128,11 +126,9 @@ class TeacherSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user_data = validated_data.pop('user')
-        user = User(**user_data)
-        user.set_password(user_data['password'])
-        user.save()
-        Teacher.objects.create(user=user, **validated_data)
-        return user
+        user = User.objects.create_user(**user_data)
+        teacher = Teacher.objects.create(user=user, **validated_data)
+        return teacher
 
     def create_student(self, student_data):
         user_data = student_data.pop('user')
@@ -189,11 +185,9 @@ class StudentSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         user_data = validated_data.pop('user')
-        user = User(**user_data)
-        user.set_password(user_data['password'])
-        user.save()
-        Student.objects.create(user=user, **validated_data)
-        return user
+        user = User.objects.create_user(**user_data)
+        student = Student.objects.create(user=user, **validated_data)
+        return student
     
 class StudentRegistrationSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=255, required=True)
