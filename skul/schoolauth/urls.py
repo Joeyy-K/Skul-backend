@@ -8,4 +8,7 @@ urlpatterns = [
     path('login/', views.LoginView.as_view(), name='login'),
     path('csrf/', views.GetCSRFToken.as_view()),
     path('user/logout/', views.LogoutView.as_view()),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+] 
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

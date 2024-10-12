@@ -11,6 +11,12 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+# SECURITY WARNING: don't run with debug turned on in production!
+import os
+import dj_database_url
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,17 +26,16 @@ BASE_URL = 'http://127.0.0.1:8000'
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-@4(5_)@(!cn(w4&e3&t_#!f&cj)hf2$udyjtx$a-*@-!x^)o_&'
+SECRET_KEY = os.environ.get('SECRET_KEY', '137d38c08f29580c7e0d9d089a01750b')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
 
-import os
-import dj_database_url
+# Cloudinary settings
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.environ.get('darvuywhb'),
+    'API_KEY': os.environ.get('913177269764622'),
+    'API_SECRET': os.environ.get('nS5gJEKSCkqsOJug4fi66lVfv4Q')
+}
 
-DEBUG = 'RENDER' not in os.environ
-
-ALLOWED_HOSTS = ['krnjjoe.pythonanywhere.com']
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -38,7 +43,9 @@ REST_FRAMEWORK = {
     ]
 }
 
-ALLOWED_HOSTS = []
+DEBUG = 'RENDER' not in os.environ
+
+ALLOWED_HOSTS = ['*']
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
@@ -57,6 +64,8 @@ INSTALLED_APPS = [
     'schoolauth',
     'rest_framework',
     'corsheaders',
+    'cloudinary',
+    'cloudinary_storage',
     'rest_framework.authtoken',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -110,6 +119,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'skul.wsgi.application'
 
+# Django Cloudinary Storage settings
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases

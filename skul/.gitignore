@@ -1,0 +1,49 @@
+# Python
+*.py[cod]
+__pycache__/
+*.so
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Static files
+/static/
+
+# Media files
+/media/
+
+# Virtual environment
+venv/
+*.venv
+env/
+*.env
+
+# IDE specific files
+.vscode/
+.idea/
+
+# Cloudinary
+cloudinary_python.txt
+
+# Sensitive information
+*.env
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# .gitignore
+
+# Ignore .env file with sensitive information
+.env
+
+# Ignore media directory (no longer needed for file storage)
+media/

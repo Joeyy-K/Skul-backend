@@ -1,10 +1,12 @@
 from django.db import models
+from cloudinary.models import CloudinaryField
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import FileExtensionValidator
 from django.conf import settings
 from django.core.files.base import ContentFile
 from PIL import Image, ImageDraw, ImageFont
-import random
+import cloudinary
+import cloudinary.uploader
 import io
 
 class Channel(models.Model):
@@ -20,10 +22,9 @@ class User(AbstractUser):
     is_school = models.BooleanField('is_school', default=False)
     is_teacher = models.BooleanField('is_teacher', default=False)
     is_student = models.BooleanField('is_student', default=False)
-    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
+    avatar = CloudinaryField('avatar', null=True, blank=True)
  
     def generate_avatar(self):
-        # note: Generates a 128x128 image
         img = Image.new('RGB', (128, 128), color=self.get_background_color())
         d = ImageDraw.Draw(img)
         
@@ -38,37 +39,19 @@ class User(AbstractUser):
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
         
-        position = ((128-text_width)/2, (128-text_height)/2 - bbox[1])  # Adjust for font baseline
+        position = ((128-text_width)/2, (128-text_height)/2 - bbox[1])
         
         d.text(position, initials, fill=(255, 255, 255), font=font)
         
-        # note: it saves the image to a bytes buffer
         buffer = io.BytesIO()
         img.save(buffer, format='PNG')
+        buffer.seek(0)
         
-        self.avatar.save(f'{self.username}_avatar.png', ContentFile(buffer.getvalue()), save=False)
-
-    def get_avatar_text(self):
-        if self.is_school:
-            return self.school.full_name[:2].upper() if hasattr(self, 'school') else 'SC'
-        elif self.is_teacher:
-            return self.teacher.first_name[0].upper() if hasattr(self, 'teacher') else 'T'
-        elif self.is_student:
-            return self.student.first_name[0].upper() if hasattr(self, 'student') else 'S'
-        else:
-            return self.username[0].upper()
-
-    def get_background_color(self):
-        return (
-            random.randint(100, 200),
-            random.randint(100, 200),
-            random.randint(100, 200)
-        )
-
-    def save(self, *args, **kwargs):
-        if not self.avatar:
-            self.generate_avatar()
-        super().save(*args, **kwargs)
+        # Upload to Cloudinary
+        result = cloudinary.uploader.upload(buffer, folder="avatars")
+        
+        # Save the Cloudinary public_id to the avatar field
+        self.avatar = result['public_id']
 
 class School(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE,  null=True)
@@ -148,13 +131,13 @@ class Assignment(models.Model):
     due_date = models.DateTimeField()
     teacher = models.ForeignKey('Teacher', on_delete=models.CASCADE)
     grade = models.ForeignKey('Grade', on_delete=models.CASCADE)
-    file = models.FileField(
-        upload_to='assignements/',
-        null=True,
-        blank=True,
-        validators=[FileExtensionValidator(['pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png'])]
-    )
-    image = models.ImageField(upload_to='assignments/images/', null=True, blank=True)
+    file = CloudinaryField('file', 
+                           resource_type='auto', 
+                           null=True, 
+                           blank=True)
+    image = CloudinaryField('image', 
+                            null=True, 
+                            blank=True)
 
     def __str__(self):
         return self.title
@@ -163,7 +146,7 @@ class AssignmentSubmission(models.Model):
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE)
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     submission_date = models.DateTimeField(auto_now_add=True)
-    file = models.FileField(upload_to='assignments/')
+    file = CloudinaryField('file', resource_type='auto')
 
     @property
     def student_name(self):
@@ -179,11 +162,9 @@ class Schedules(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
     publish_date = models.DateTimeField(auto_now_add=True)
-    file = models.FileField(
-        upload_to='schedules/',
-        null=True,
-        blank=True,
-        validators=[FileExtensionValidator(['pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png'])]
-    )
+    file = CloudinaryField('file', 
+                           resource_type='auto', 
+                           null=True, 
+                           blank=True)
     school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='schedules') 
     creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_schedules')
