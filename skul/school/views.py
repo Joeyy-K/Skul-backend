@@ -386,11 +386,7 @@ class AnnouncementDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class ChannelList(generics.ListCreateAPIView):
     queryset = Channel.objects.all()
-    serializer_class = ChannelSerializer
-
-class ChannelDetail(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Channel.objects.all()
-    serializer_class = ChannelSerializer   
+    serializer_class = ChannelSerializer 
 
 class EventList(generics.ListCreateAPIView):
     queryset = Event.objects.all()

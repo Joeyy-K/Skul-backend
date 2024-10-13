@@ -1,4 +1,5 @@
 from rest_framework import serializers
+
 from school.models import User, School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Event, Announcement
 
 class ChannelSerializer(serializers.ModelSerializer):
@@ -11,8 +12,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'is_school', 'is_teacher', 'is_student', 'channels']
-        extra_kwargs = {'password': {'write_only': True}}
+        fields = ['id', 'username', 'password', 'email', 'is_school', 'is_teacher', 'is_student', 'channels']
 
     def create(self, validated_data):
         user = User(**validated_data)
@@ -25,30 +25,41 @@ class SchoolSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = School
-        fields = [ 'id', 'user', 'full_name', 'location']
+        fields = ['id', 'user', 'full_name', 'location']
 
     def create(self, validated_data):
         user_data = validated_data.pop('user')
-        user = User(**user_data)
-        user.set_password(user_data['password'])
+        user = User.objects.create_user(**user_data)
+        user.is_school = True
         user.save()
-        School.objects.create(user=user, **validated_data)
-        return user
+        school = School.objects.create(user=user, **validated_data)
+        return school
 
 class TeacherSerializer(serializers.ModelSerializer):
     user = UserSerializer()
 
     class Meta:
         model = Teacher
-        fields = ['id', 'user', 'first_name', 'last_name', 'school', 'grade']
+        fields = ['id', 'user', 'first_name', 'last_name', 'school']
 
     def create(self, validated_data):
         user_data = validated_data.pop('user')
-        user = User(**user_data)
-        user.set_password(user_data['password'])
+        school_data = validated_data.pop('school')
+        user = User.objects.create_user(**user_data)
+        user.is_teacher = True
         user.save()
-        Teacher.objects.create(user=user, **validated_data)
-        return user
+
+        if isinstance(school_data, School):
+            school = school_data
+        elif isinstance(school_data, int):
+            school = School.objects.get(id=school_data)
+        elif isinstance(school_data, dict) and 'id' in school_data:
+            school = School.objects.get(id=school_data['id'])
+        else:
+            raise serializers.ValidationError("Invalid school data. Expected a School instance, an integer ID, or a dict with 'id'.")
+
+        teacher = Teacher.objects.create(user=user, school=school, **validated_data)
+        return teacher
 
     def create_student(self, student_data):
         user_data = student_data.pop('user')
@@ -96,7 +107,7 @@ class StudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
         fields = ['id', 'user', 'first_name', 'last_name', 'school', 'grade', 'school_name', 'grade_name']
-
+    
     def get_school_name(self, obj):
         return obj.school.full_name if obj.school else None
 
@@ -105,11 +116,22 @@ class StudentSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         user_data = validated_data.pop('user')
-        user = User(**user_data)
-        user.set_password(user_data['password'])
+        school_data = validated_data.pop('school')
+        user = User.objects.create_user(**user_data)
+        user.is_student = True
         user.save()
-        Student.objects.create(user=user, **validated_data)
-        return user
+
+        if isinstance(school_data, School):
+            school = school_data
+        elif isinstance(school_data, int):
+            school = School.objects.get(id=school_data)
+        elif isinstance(school_data, dict) and 'id' in school_data:
+            school = School.objects.get(id=school_data['id'])
+        else:
+            raise serializers.ValidationError("Invalid school data. Expected a School instance, an integer ID, or a dict with 'id'.")
+
+        student = Student.objects.create(user=user, school=school, **validated_data)
+        return student
     
 class StudentRegistrationSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=255, required=True)
