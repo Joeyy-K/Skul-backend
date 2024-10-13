@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from school.models import User, School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Schedules
 from django.conf import settings
+from cloudinary.utils import cloudinary_url
 
 class UserProfileSerializer(serializers.ModelSerializer):
     school_info = serializers.SerializerMethodField()
@@ -90,12 +91,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_avatar_url(self, obj):
         if obj.avatar:
-            request = self.context.get('request')
-            if request is not None:
-                return request.build_absolute_uri(obj.avatar.url)
-            else:
-                # Fallback to using the base URL from settings
-                return f"{settings.BASE_URL}{obj.avatar.url}"
+            return cloudinary_url(obj.avatar.public_id)[0]
         return None
 
     def create(self, validated_data):

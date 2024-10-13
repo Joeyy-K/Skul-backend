@@ -1,5 +1,5 @@
 from django.db import models
-from cloudinary.models import CloudinaryField
+from .custom_fields import CloudinaryField
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import FileExtensionValidator
 from django.conf import settings

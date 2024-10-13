@@ -9,33 +9,17 @@ https://docs.djangoproject.com/en/5.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
-
 from pathlib import Path
-# SECURITY WARNING: don't run with debug turned on in production!
 import os
 import dj_database_url
-import cloudinary
-import cloudinary.uploader
-import cloudinary.api
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 BASE_URL = 'http://127.0.0.1:8000'
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('SECRET_KEY', '137d38c08f29580c7e0d9d089a01750b')
-
-
-# Cloudinary settings
-CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': os.environ.get('darvuywhb'),
-    'API_KEY': os.environ.get('913177269764622'),
-    'API_SECRET': os.environ.get('nS5gJEKSCkqsOJug4fi66lVfv4Q')
-}
-
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -64,8 +48,8 @@ INSTALLED_APPS = [
     'schoolauth',
     'rest_framework',
     'corsheaders',
-    'cloudinary',
     'cloudinary_storage',
+    'cloudinary',
     'rest_framework.authtoken',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -179,3 +163,18 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Cloudinary settings
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME', 'darvuywhb'),
+    'API_KEY': os.environ.get('CLOUDINARY_API_KEY', '913177269764622'),
+    'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET', 'nS5gJEKSCkqsOJug4fi66lVfv4Q')
+}
+
+# Configure Cloudinary
+import cloudinary
+cloudinary.config(
+    cloud_name=CLOUDINARY_STORAGE['CLOUD_NAME'],
+    api_key=CLOUDINARY_STORAGE['API_KEY'],
+    api_secret=CLOUDINARY_STORAGE['API_SECRET']
+)
