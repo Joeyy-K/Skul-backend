@@ -92,7 +92,7 @@ class RegisterView(APIView):
         
         user.save()
         return instance
-    
+
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class LoginView(APIView):
     def post(self, request):

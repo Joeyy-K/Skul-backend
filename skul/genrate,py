@@ -1,0 +1,67 @@
+import os
+import django
+
+# Set up Django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "skul.settings")
+django.setup()
+
+import random
+from django.db import transaction
+from faker import Faker
+from school.models import School, Grade, Teacher, User  # Replace 'your_app' with your actual app name
+
+fake = Faker()
+
+def generate_teachers(school_id, num_teachers=8):
+    try:
+        school = School.objects.get(id=school_id)
+    except School.DoesNotExist:
+        print(f"Error: School with id {school_id} does not exist.")
+        return
+
+    grades = list(Grade.objects.filter(school=school))
+    if not grades:
+        print("Error: No grades found for this school. Please create grades first.")
+        return
+
+    available_grades = grades.copy()
+
+    with transaction.atomic():
+        for i in range(num_teachers):
+            first_name = fake.first_name()
+            last_name = fake.last_name()
+            username = f"teacher_{first_name.lower()}{last_name.lower()}{random.randint(1, 99)}"
+            email = f"{username}@example.com"
+
+            # Create User instance
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password="teacherpass123",  # You should use a secure method to generate passwords
+                is_teacher=True
+            )
+
+            # Assign a grade if available, otherwise leave it as None
+            assigned_grade = None
+            if available_grades:
+                assigned_grade = available_grades.pop(0)
+
+            # Create Teacher instance
+            teacher = Teacher.objects.create(
+                user=user,
+                first_name=first_name,
+                last_name=last_name,
+                school=school,
+                grade=assigned_grade
+            )
+
+            if assigned_grade:
+                print(f"Created teacher: {teacher.first_name} {teacher.last_name}, assigned to {assigned_grade.name}")
+            else:
+                print(f"Created teacher: {teacher.first_name} {teacher.last_name}, not assigned to a specific grade")
+
+    print(f"Teacher generation completed. {num_teachers} teachers added.")
+
+# Usage
+# Replace 1 with your actual school ID
+generate_teachers(school_id=1, num_teachers=8)

@@ -118,7 +118,7 @@ class SchoolSerializer(serializers.ModelSerializer):
         return school
 
 class TeacherSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
+    user = UserSerializer()
 
     class Meta:
         model = Teacher

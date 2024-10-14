@@ -23,11 +23,11 @@ BASE_URL = 'http://127.0.0.1:8000'
 SECRET_KEY = 'django-insecure-@4(5_)@(!cn(w4&e3&t_#!f&cj)hf2$udyjtx$a-*@-!x^)o_&'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 import os
 
-ALLOWED_HOSTS = ['krnjjoe.pythonanywhere.com']
+ALLOWED_HOSTS = ['*']
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
