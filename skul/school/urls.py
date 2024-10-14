@@ -54,4 +54,3 @@ urlpatterns = [
     path('schedules/', views.ScheduleListCreateView.as_view(), name='schedule-list-create'),
     path('schedules/<int:pk>/', views.ScheduleRetrieveUpdateDestroyView.as_view(), name='schedule-detail'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-

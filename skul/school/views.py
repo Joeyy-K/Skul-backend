@@ -587,4 +587,3 @@ class ScheduleRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return Schedules.objects.filter(school=self.request.user.school)
-
