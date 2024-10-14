@@ -1,18 +1,102 @@
 from rest_framework import serializers
+from school.models import User, School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Schedules
+from django.conf import settings
 
-from school.models import User, School, Teacher, Student, Assignment, AssignmentSubmission, Grade, Channel, Message, Feedback, Attendance, Event, Announcement
-
-class ChannelSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Channel
-        fields = ['id', 'name', 'description', 'type', 'is_visible_to_students', 'school']
-
-class UserSerializer(serializers.ModelSerializer):
-    channels = ChannelSerializer(many=True, read_only=True)
+class UserProfileSerializer(serializers.ModelSerializer):
+    school_info = serializers.SerializerMethodField()
+    teacher_info = serializers.SerializerMethodField()
+    student_info = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'password', 'email', 'is_school', 'is_teacher', 'is_student', 'channels']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'is_school', 'is_teacher', 'is_student', 'school_info', 'teacher_info', 'student_info']
+        extra_kwargs = {'username': {'required': False}}
+
+    def get_school_info(self, obj):
+        if obj.is_school:
+            school = School.objects.get(user=obj)
+            return {
+                'full_name': school.full_name,
+                'location': school.location
+            }
+        return None
+
+    def get_teacher_info(self, obj):
+        if obj.is_teacher:
+            teacher = Teacher.objects.get(user=obj)
+            return {
+                'first_name': teacher.first_name,
+                'last_name': teacher.last_name,
+                'school': teacher.school.full_name if teacher.school else None,
+                'grade': teacher.grade.name if teacher.grade else None
+            }
+        return None
+
+    def get_student_info(self, obj):
+        if obj.is_student:
+            student = Student.objects.get(user=obj)
+            return {
+                'first_name': student.first_name,
+                'last_name': student.last_name,
+                'school': student.school.full_name if student.school else None,
+                'grade': student.grade.name if student.grade else None
+            }
+        return None
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            if attr in ['username', 'email', 'first_name', 'last_name']:
+                setattr(instance, attr, value)
+        instance.save()
+
+        if instance.is_school:
+            school = School.objects.get(user=instance)
+            school_data = validated_data.get('school_info', {})
+            for attr, value in school_data.items():
+                setattr(school, attr, value)
+            school.save()
+        elif instance.is_teacher:
+            teacher = Teacher.objects.get(user=instance)
+            teacher_data = validated_data.get('teacher_info', {})
+            for attr, value in teacher_data.items():
+                setattr(teacher, attr, value)
+            teacher.save()
+        elif instance.is_student:
+            student = Student.objects.get(user=instance)
+            student_data = validated_data.get('student_info', {})
+            for attr, value in student_data.items():
+                setattr(student, attr, value)
+            student.save()
+
+        return instance
+    
+class ChannelSerializer(serializers.ModelSerializer):
+    creator = serializers.PrimaryKeyRelatedField(read_only=True)
+    
+    class Meta:
+        model = Channel
+        fields = ['id', 'name', 'description', 'type', 'is_visible_to_students', 'school', 'creator']
+
+from django.conf import settings
+
+class UserSerializer(serializers.ModelSerializer):
+    channels = ChannelSerializer(many=True, read_only=True)
+    avatar_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'is_school', 'is_teacher', 'is_student', 'channels', 'avatar_url']
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def get_avatar_url(self, obj):
+        if obj.avatar:
+            request = self.context.get('request')
+            if request is not None:
+                return request.build_absolute_uri(obj.avatar.url)
+            else:
+                # Fallback to using the base URL from settings
+                return f"{settings.BASE_URL}{obj.avatar.url}"
+        return None
 
     def create(self, validated_data):
         user = User(**validated_data)
@@ -30,8 +114,6 @@ class SchoolSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user_data = validated_data.pop('user')
         user = User.objects.create_user(**user_data)
-        user.is_school = True
-        user.save()
         school = School.objects.create(user=user, **validated_data)
         return school
 
@@ -40,25 +122,12 @@ class TeacherSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Teacher
-        fields = ['id', 'user', 'first_name', 'last_name', 'school']
+        fields = ['id', 'user', 'first_name', 'last_name', 'school', 'grade', 'user', 'school_name', 'grade_name']
 
     def create(self, validated_data):
         user_data = validated_data.pop('user')
-        school_data = validated_data.pop('school')
         user = User.objects.create_user(**user_data)
-        user.is_teacher = True
-        user.save()
-
-        if isinstance(school_data, School):
-            school = school_data
-        elif isinstance(school_data, int):
-            school = School.objects.get(id=school_data)
-        elif isinstance(school_data, dict) and 'id' in school_data:
-            school = School.objects.get(id=school_data['id'])
-        else:
-            raise serializers.ValidationError("Invalid school data. Expected a School instance, an integer ID, or a dict with 'id'.")
-
-        teacher = Teacher.objects.create(user=user, school=school, **validated_data)
+        teacher = Teacher.objects.create(user=user, **validated_data)
         return teacher
 
     def create_student(self, student_data):
@@ -107,7 +176,7 @@ class StudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
         fields = ['id', 'user', 'first_name', 'last_name', 'school', 'grade', 'school_name', 'grade_name']
-    
+
     def get_school_name(self, obj):
         return obj.school.full_name if obj.school else None
 
@@ -116,21 +185,8 @@ class StudentSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         user_data = validated_data.pop('user')
-        school_data = validated_data.pop('school')
         user = User.objects.create_user(**user_data)
-        user.is_student = True
-        user.save()
-
-        if isinstance(school_data, School):
-            school = school_data
-        elif isinstance(school_data, int):
-            school = School.objects.get(id=school_data)
-        elif isinstance(school_data, dict) and 'id' in school_data:
-            school = School.objects.get(id=school_data['id'])
-        else:
-            raise serializers.ValidationError("Invalid school data. Expected a School instance, an integer ID, or a dict with 'id'.")
-
-        student = Student.objects.create(user=user, school=school, **validated_data)
+        student = Student.objects.create(user=user, **validated_data)
         return student
     
 class StudentRegistrationSerializer(serializers.Serializer):
@@ -171,17 +227,32 @@ class StudentRegistrationSerializer(serializers.Serializer):
 class AssignmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Assignment
-        fields = ['id', 'title', 'description', 'due_date', 'teacher', 'file', 'grade' ]
+        fields = ['id', 'title', 'description', 'due_date', 'teacher', 'grade', 'file']
 
 class AssignmentSubmissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AssignmentSubmission
-        fields = ['id', 'assignment', 'student', 'submission_date', 'file']
+        fields = ['id', 'assignment', 'student', 'submission_date', 'file', 'student_name']
+
+class StudentSubmissionStatusSerializer(serializers.ModelSerializer):
+    has_submitted = serializers.BooleanField()
+    submission_date = serializers.DateTimeField()
+
+    class Meta:
+        model = Student
+        fields = ['id', 'first_name', 'last_name', 'has_submitted', 'submission_date']
+
+class AssignmentSubmissionStatusSerializer(serializers.ModelSerializer):
+    students = StudentSubmissionStatusSerializer(many=True)
+
+    class Meta:
+        model = Assignment
+        fields = ['id', 'title', 'description', 'due_date', 'students']
 
 class GradeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Grade
-        fields = ['id', 'name', 'school', 'teacher']
+        fields = ['id', 'name', 'school', 'teacher', 'school_name', 'teacher_name']
 
     def create(self, validated_data):
         school_data = validated_data.pop('school', None)
@@ -196,27 +267,12 @@ class GradeSerializer(serializers.ModelSerializer):
 
         return grade
 
-class AnnouncementSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Announcement
-        fields = ['id', 'title', 'content', 'publish_date', 'school', 'attachment']
-
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
-        fields = ['id', 'sender', 'channel', 'content', 'timestamp']
+        fields = ['id', 'sender', 'channel', 'content', 'timestamp']    
 
-class FeedbackSerializer(serializers.ModelSerializer):
+class SchedulesSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Feedback
-        fields = ['content', 'sender', 'receiver', 'visible_to_students']
-
-class AttendanceSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Attendance
-        fields = ['id', 'student', 'date', 'status', 'notes']       
-
-class EventSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Event
-        fields = ['id', 'title', 'description', 'start_date', 'end_date', 'event_type', 'related_entities', 'related_teachers']
+        model = Schedules
+        fields = ['id', 'title', 'description', 'file', 'school', 'creator', 'publish_date' ]
